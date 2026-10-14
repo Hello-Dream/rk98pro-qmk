@@ -67,16 +67,20 @@
             "key": "KC_TEST"
         },
         {
-            "key": "EF_PLASMA"
+            "key": "EF_PLASMA",
+            "aliases": ["PLASMA"]
         },
         {
-            "key": "EF_SPARKLE"
+            "key": "EF_SPARKLE",
+            "aliases": ["SPARKLE"]
         },
         {
-            "key": "EF_RIPPLE"
+            "key": "EF_RIPPLE",
+            "aliases": ["RIPPLE"]
         },
         {
-            "key": "EF_BREATH"
+            "key": "EF_BREATH",
+            "aliases": ["BREATH"]
         },
         {
             "key": "EF_FIRE"

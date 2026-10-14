@@ -13,10 +13,12 @@ jobs:
       - name: Disable git safe.directory check
         run: git config --global --add safe.directory '*'
 
-      - name: Checkout QMK firmware
+      - name: Checkout QMK firmware (vendor fork)
         uses: actions/checkout@v4
         with:
-          repository: qmk/qmk_firmware
+          # 这份固件依赖厂商 fork 的 eeconfig / 无线模块接口，不能直接用官方 qmk/qmk_firmware
+          repository: yangzheng20003/qmk_firmware
+          ref: master
           submodules: recursive
 
       - name: Checkout this keyboard repo

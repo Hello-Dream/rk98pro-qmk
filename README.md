@@ -49,7 +49,7 @@ make royalkludge/rk98pro_us_triple_mode:default
 
 仓库自带 `.github/workflows/build.yml`：push 或在 Actions 页手动触发后，会在 QMK 官方容器（`ghcr.io/qmk/qmk_cli`）里检出 `qmk/qmk_firmware`、叠加本仓库的 `keyboards/` 并编译，产物在该次运行的 **Artifacts** 里下载。
 
-> 本仓库已包含无线模块 `keyboards/linker/wireless/`；WB32 平台支持由官方 QMK 提供，因此可直接在官方基座上编译。
+> 基座使用维护者的 QMK fork **`yangzheng20003/qmk_firmware`**（它保留了本固件依赖的 `EECONFIG_USER_DATABLOCK` 等接口）；本仓库另带无线模块 `keyboards/linker/wireless/`。
 
 ## 烧录
 
