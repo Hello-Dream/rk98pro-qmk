@@ -1,0 +1,43 @@
+name: Build QMK firmware
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: ghcr.io/qmk/qmk_cli
+
+    steps:
+      - name: Disable git safe.directory check
+        run: git config --global --add safe.directory '*'
+
+      - name: Checkout QMK firmware
+        uses: actions/checkout@v4
+        with:
+          repository: qmk/qmk_firmware
+          submodules: recursive
+
+      - name: Checkout this keyboard repo
+        uses: actions/checkout@v4
+        with:
+          path: _keyboard
+
+      - name: Overlay keyboard into QMK tree
+        run: |
+          cp -r _keyboard/keyboards/. keyboards/
+          find keyboards/linker keyboards/royalkludge -maxdepth 3 | sort
+
+      - name: Build firmware
+        run: make royalkludge/rk98pro_us_triple_mode:default
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rk98pro-firmware
+          path: |
+            *.bin
+            *.hex
+            *.uf2
+          if-no-files-found: error

@@ -1,0 +1,22 @@
+# 编译产物
+.build/
+*.bin
+*.hex
+*.elf
+*.uf2
+*.map
+*.lst
+*.o
+*.d
+*.a
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# 日志 / 临时
+*.log
+*.tmp
