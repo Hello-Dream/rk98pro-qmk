@@ -60,6 +60,7 @@ bool lower_sleep             = false;
 bool state                   = false;
 static bool linker_ok        = false;
 uint32_t hs_suspend_timer    = 0;
+static uint32_t hs_bat_show_timer = 0;
 uint16_t hs_deb              = DEBOUNCE;
 bool im_test_rate_flag;
 HSV start_hsv;
@@ -1094,9 +1095,12 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
             return false;
         } break;
 #endif
-        case HS_BATQ: {
+        case HS_BATQ: { // 按一下显示电量约 3 秒（有线/无线都显示）
             extern bool rk_bat_req_flag;
-            rk_bat_req_flag = (confinfo.devs != DEVS_USB) && record->event.pressed;
+            if (record->event.pressed) {
+                rk_bat_req_flag   = true;
+                hs_bat_show_timer = timer_read32();
+            }
             return false;
         } break;
         default:
@@ -1156,6 +1160,12 @@ void housekeeping_task_user(void) { // loop
     hs_usb_charging_switch();
     hs_rgb_blink_hook_user();
     hs_set_sleep_state();
+
+    // 电量条显示约 3 秒后自动关掉
+    extern bool rk_bat_req_flag;
+    if (rk_bat_req_flag && timer_elapsed32(hs_bat_show_timer) > 3000) {
+        rk_bat_req_flag = false;
+    }
 }
 
 #ifdef RGB_MATRIX_ENABLE

@@ -79,8 +79,8 @@
 #define RGB_MATRIX_FRAMEBUFFER_EFFECTS
 #define RGB_MATRIX_KEYPRESSES
 
-/* 内置动效已在 keyboard.json 中全部关闭，只保留自定义效果；默认动效指向自定义效果 */
-#define RGB_MATRIX_DEFAULT_MODE RGB_MATRIX_CUSTOM_HS_PLASMA
+/* 内置动效（部分）+ 自定义效果；默认动效用经典的 cycle_left_right */
+#define RGB_MATRIX_DEFAULT_MODE RGB_MATRIX_CYCLE_LEFT_RIGHT
 
 /* RGB Light */
 #define RGBLED_NUM 8

@@ -6,7 +6,7 @@ Royal Kludge **RK98PRO**（QMK 路径 `royalkludge/rk98pro_us_triple_mode`）的
 
 - 98% 配列（100 键），三模：USB / 蓝牙 ×3 / 2.4G
 - RGB Matrix 背光（每键）+ 8 颗侧灯
-- 灯效：仅保留 7 个自定义效果（内置 44 个 QMK 动效已全部关闭）
+- 灯效：20 个经典内置动效 + 7 个自定义效果（`HS_*`）+ 按键 RGB 录制
 - 支持 VIA 改键、按键 RGB 录制
 - 去抖固定 **10ms**（已移除 1ms 低延迟模式，避免连击）
 
@@ -90,8 +90,10 @@ make royalkludge/rk98pro_us_triple_mode:default:flash
 | `HS_RAINDROPS` | Raindrops 雨滴 | Fn+0 |
 
 - 直达键位于 Fn 层（Windows `_FL` / macOS `_MFL`），可在 VIA 中改绑到其它键。
+- 另有 **20 个经典内置动效**（单色常亮 / 呼吸 / 渐变 / 彩虹 / 按键反应等），可用 `RGB_MOD`（Fn+PrtSc）循环，或在 VIA 的 Lighting → Effect 里选择。
 - 也可用 `RGB_MOD`（Fn+PrtSc）逐个循环到这些效果。
 - 背光开关快捷键：**Fn+Backspace**（Windows `_FL` / macOS `_MFL`）。
+- **电量显示**：按一下 **Fn+Enter**（`HS_BATQ`）→ 点亮 LED 64–73 共 10 颗电量灯，约 3 秒后自动熄灭（有线 / 无线均可用）。
 
 ## 许可
 
