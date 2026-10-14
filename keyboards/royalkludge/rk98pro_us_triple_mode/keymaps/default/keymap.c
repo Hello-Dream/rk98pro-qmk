@@ -41,7 +41,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
     [_MFL] = LAYOUT( /* Base */
         _______,   KC_BRID,   KC_BRIU,  LCTL(KC_UP),LGUI(KC_D),  RM_VALD,  RM_VALU,  KC_MPRV,  KC_MPLY,  KC_MNXT,    KC_MUTE,  KC_VOLD,   KC_VOLU,  RGB_MOD,   RGB_HUI,  RP_END,  KC_SCRL,  KC_PAUSE, KC_END,
-        _______,   RP_P0,     RP_P1,    RP_P2,      EF_PLASMA, EF_SPARKLE, EF_RIPPLE, EF_BREATH, EF_FIRE, EF_SCAN, EF_RAIN, _______,  _______,   RGB_TOG,  _______,             _______,  _______,  _______, _______,
+        _______,   RP_P0,     RP_P1,    RP_P2,      EF_PLASMA, EF_SPARKLE, EF_RIPPLE, EF_BREATH, EF_FIRE, EF_SCAN, EF_RAIN, _______,  _______,   RGB_TOG,             _______,  _______,  _______, _______,
         _______,   KC_BT1,    KC_BT2,   KC_BT3,     _______,     _______,  _______,  _______,  _______, MO(_DEFA),   KC_2G4,   _______,   _______,  _______,             _______,  _______,  _______, _______,
         _______,   TO(_BL),   KC_NO,    _______,    _______,     _______,  _______,  _______,  _______, MO(_DEFA),   _______,  _______,             HS_BATQ,             _______,  _______,  _______,  
         _______,   DEB_TOG,   _______,  _______,    _______,     NK_TOGG,  _______,  _______,  _______, _______,     _______,             MO(_DEFA),           RM_VALU,  _______,  _______,  _______, _______,  
