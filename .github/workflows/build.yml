@@ -21,6 +21,13 @@ jobs:
           ref: master
           submodules: recursive
 
+      - name: Install QMK Python requirements
+        run: |
+          # 该 fork 的 requirements 与容器自带的不同（如 appdirs），需按提示安装
+          PY=/opt/uv/tools/qmk/bin/python3
+          if [ ! -x "$PY" ]; then PY=$(command -v python3); fi
+          "$PY" -m pip install -r requirements.txt
+
       - name: Checkout this keyboard repo
         uses: actions/checkout@v4
         with:
