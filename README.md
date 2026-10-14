@@ -73,6 +73,22 @@ make royalkludge/rk98pro_us_triple_mode:default:flash
 或用烧录工具（QMK Toolbox / `wb32-dfu-updater_cli`）刷入 `royalkludge_rk98pro_us_triple_mode_default.bin`。
 刷完若仍停在 DFU（`342D:DFA0`），**拔插一次 USB** 即可进入应用模式。
 
+## ⚠️ 升级注意：必须清空 EEPROM（EE_CLR）
+
+本固件持久化设置（`confinfo`）的存储结构与厂商原版**不同**，且没有版本号/校验。**从厂商原版固件（或更早的旧版本）升级后，请务必清空一次 EEPROM**，否则可能出现：
+
+- 睡眠超时档位错乱；
+- 侧灯模式 / 颜色不对；
+- 退出按键 RGB 录制后动效跳错，甚至背光全灭。
+
+清空方式（任选其一）：
+
+1. **Bootmagic（推荐，最稳）**：按住 `Esc` 键再插 USB 线（会一并清除持久设置）。
+2. **Fn + Space 按住 3 秒**（`EE_CLR` 键在 Fn 层的空格；注意此方式需要**背光处于开启状态**才会执行）。
+3. **VIA**：用 VIA 里的 EEPROM Reset 复位。
+
+全新设备、或已经清过一次的设备无需重复。
+
 ## VIA
 
 用 `keyboards/royalkludge/rk98pro_us_triple_mode/rk98pro_us_triple_mode.json` 作为 VIA 定义加载，即可改键与调节灯效。

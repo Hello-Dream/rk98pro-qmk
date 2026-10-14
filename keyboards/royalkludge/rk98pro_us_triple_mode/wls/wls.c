@@ -155,9 +155,9 @@ bool hs_rgb_blink_hook() {
             if (hs_rgb_blink_get_timer() == 0x00) {
                 hs_rgb_blink_set_timer(timer_read32());
             } else {
-                if (timer_elapsed32(hs_rgb_blink_get_timer()) >= timeout && !rgbrec_is_started()) {
+                if (timeout && timer_elapsed32(hs_rgb_blink_get_timer()) >= timeout && !rgbrec_is_started()) {
                     hs_rgb_blink_set_timer(timer_read32());
-                    // clear_keyboard();
+                    clear_keyboard(); // 进睡前清键，避免唤醒后卡键
                     lpwr_set_timeout_manual(true);
                 }
             }
@@ -200,12 +200,6 @@ void lpwr_exti_init_hook(void) {
     setPinInputHigh(HS_2G4_DEF_PIN);
     waitInputPinDelay();
     palEnableLineEvent(HS_2G4_DEF_PIN, PAL_EVENT_MODE_BOTH_EDGES);
-#endif
-
-#ifdef BAT_FULL_PIN
-    setPinInputHigh(BAT_FULL_PIN);
-    waitInputPinDelay();
-    palEnableLineEvent(BAT_FULL_PIN, PAL_EVENT_MODE_FALLING_EDGE);
 #endif
 
     if (lower_sleep) {
@@ -257,18 +251,22 @@ void lpwr_stop_hook_pre(void) { // wireless sleep
     gpio_write_pin_low(LED_POWER_EN_PIN);
 #endif
 
-#ifdef HS_LED_BOOSTING_PIN
-    gpio_write_pin_low(HS_LED_BOOSTING_PIN);
+    // 睡眠前把指示灯置灭（LED_PIN_ON_STATE=0，写 1 为灭），对齐原厂
+#ifdef LED_NUM_PIN
+    writePin(LED_NUM_PIN, !LED_PIN_ON_STATE);
 #endif
-
-#ifdef LED_WIN_PIN
-    gpio_write_pin_low(LED_WIN_PIN);
+#ifdef LED_SCROLL_PIN
+    writePin(LED_SCROLL_PIN, !LED_PIN_ON_STATE);
 #endif
-
 #ifdef LED_CAPS_PIN
-    gpio_write_pin_low(LED_CAPS_PIN);
+    writePin(LED_CAPS_PIN, !LED_PIN_ON_STATE);
 #endif
-
+#ifdef LED_WIN_PIN
+    writePin(LED_WIN_PIN, !LED_PIN_ON_STATE);
+#endif
+#ifdef LED_POV_PIN
+    writePin(LED_POV_PIN, !LED_PIN_ON_STATE);
+#endif
 
     state = false;
     if (lower_sleep) {

@@ -55,12 +55,12 @@ bool mac_status              = false;
 bool charging_state          = false;
 bool bat_full_flag           = false;
 static uint32_t ee_clr_timer = 0;
-bool test_white_light_flag   = false;
 bool lower_sleep             = false;
 bool state                   = false;
 static bool linker_ok        = false;
 uint32_t hs_suspend_timer    = 0;
 static uint32_t hs_bat_show_timer = 0;
+static bool hs_bat_force_rgb     = false; // 背光原本关闭时，为显示电量条临时点亮的标记
 uint16_t hs_deb              = DEBOUNCE;
 bool im_test_rate_flag;
 HSV start_hsv;
@@ -69,7 +69,7 @@ uint8_t buff[]   = {2, 3, 4, 5, 6, 7, 8, 1, 1, 1, 0};
 static uint8_t hs_rl_mode = 0;
 
 void hs_reset_settings(void);
-void bat_indicators_hook(uint8_t index);
+void hs_bat_indicators_task(void);
 void ind_indicators_hook(uint8_t index);
 void nkr_indicators_hook(uint8_t index);
 void hs_rgb_blink_hook_user(void);
@@ -78,7 +78,7 @@ blink_rgb_t blink_rgbs[RGB_MATRIX_BLINK_COUNT] = {
     {.index = HS_RGB_BLINK_INDEX_WIN, .interval = 250, .times = 1, .color = {.r = 0xFF, .g = 0xFF, .b = 0xFF}, .blink_cb = NULL},
     {.index = HS_RGB_BLINK_INDEX_MAC, .interval = 250, .times = 1, .color = {.r = 0xFF, .g = 0xFF, .b = 0xFF}, .blink_cb = NULL},
     {.index = IM_MM_RGB_BLINK_INDEX_DEB, .interval = 250, .times = 3, .color = {.r = WIITE_B, .g = WIITE_B, .b = WIITE_B}, .blink_cb = NULL},
-    {.index = RGB_MATRIX_BLINK_INDEX_BAT, .interval = 250, .times = 3, .color = {.r = 0x00, .g = 0x00, .b = 0x00}, .blink_cb = bat_indicators_hook},
+    {.index = RGB_MATRIX_BLINK_INDEX_BAT, .interval = 250, .times = 3, .color = {.r = 0x00, .g = 0x00, .b = 0x00}, .blink_cb = NULL},
     {.index = RGB_MATRIX_BLINK_INDEX_IND, .interval = 250, .times = 3, .color = {.r = 0x00, .g = 0x00, .b = 0x00}, .blink_cb = ind_indicators_hook},
     {.index = RGB_MATRIX_BLINK_INDEX_ALL, .interval = 250, .times = 3, .color = {.r = WIITE_B, .g = 0x00, .b = 0x00}, .blink_cb = nkr_indicators_hook},
 };
@@ -102,70 +102,46 @@ void nkr_indicators_hook(uint8_t index) {
 }
 bool bat_char;
 uint32_t laste_time = 0;
-void bat_indicators_hook(uint8_t index) {
-    static uint32_t battery_process_time = 0;
-    // static bool bat_flip                 = true;
 
-    if (charging_state && ( (bat_full_flag))) { 
+// 充电指示 + 低电提示 + 低电自动关机；由主循环调用，不依赖 RGB 渲染（背光关闭时也有效）
+void hs_bat_indicators_task(void) {
+    static uint32_t battery_process_time = 0;
+
+    if (charging_state && bat_full_flag) { // 充满
         battery_process_time = 0;
-        // bat_flip             = true;
         bat_char             = false;
         writePin(LED_POV_PIN, 1);
-        // rgb_matrix_blink_set_color(index, 0x19, 0x00, 0x00);
-        // rgb_matrix_blink_set_interval_times(index, 200, 0xFF); 
-    } else if (charging_state) {                        
+    } else if (charging_state) { // 充电中
         battery_process_time = 0;
         bat_char             = false;
-        // bat_flip             = true;
         writePin(LED_POV_PIN, 0);
-        // rgb_matrix_blink_set_color(index, 0, 0x19, 0x00);
-        // rgb_matrix_blink_set_interval_times(index, 200, 0xFF); 
-    } else if (*md_getp_bat() <= BATTERY_CAPACITY_LOW) {
+    } else if (*md_getp_bat() <= BATTERY_CAPACITY_LOW) { // 低电：LED_WIN 闪烁
         bat_char = true;
         writePin(LED_POV_PIN, 1);
-        if(laste_time==0)laste_time=timer_read();
-        if(timer_elapsed(laste_time)>500){
-            laste_time=timer_read();
+        if (laste_time == 0) laste_time = timer_read();
+        if (timer_elapsed(laste_time) > 500) {
+            laste_time = timer_read();
             writePin(LED_WIN_PIN, !readPin(LED_WIN_PIN));
         }
-        // if (bat_flip) {
-        //     rgb_matrix_blink_set_color(index, 0x19, 0x00, 0x00);
-        //     rgb_matrix_blink_set_interval_times(index, 1000, 1); 
-        // } else {
-        //     rgb_matrix_blink_set_color(index, 0x00, 0x00, 0x00);
-        //     rgb_matrix_blink_set_interval_times(index, 500, 0xFF); 
-        // }
-
-        // bat_flip = !bat_flip;
-
-        if (*md_getp_bat() <= BATTERY_CAPACITY_STOP) {
+        if (*md_getp_bat() <= BATTERY_CAPACITY_STOP) { // 电量耗尽：切 USB 并进入深睡，防止过放
             if (!battery_process_time) {
                 battery_process_time = timer_read32();
             }
-
-            if (battery_process_time && timer_elapsed32(battery_process_time) > 19000) { 
+            if (battery_process_time && timer_elapsed32(battery_process_time) > 20000) {
+                battery_process_time = 0;
                 clear_keyboard();
-                if (battery_process_time && timer_elapsed32(battery_process_time) > 20000) {
-                    clear_keyboard();
-                    battery_process_time = 0;
-                    lower_sleep          = true;
-                    writePin(LED_MAC_PIN, 0);
-                    writePin(LED_POV_PIN, 1);
-                    md_send_devctrl(MD_SND_CMD_DEVCTRL_USB);
-                    lpwr_set_timeout_manual(true);
-                } 
+                lower_sleep = true;
+                writePin(LED_MAC_PIN, 0);
+                writePin(LED_POV_PIN, 1);
+                md_send_devctrl(MD_SND_CMD_DEVCTRL_USB);
+                lpwr_set_timeout_manual(true);
             }
         }
-    } else {
+    } else { // 正常
         battery_process_time = 0;
         bat_char             = false;
-        // bat_flip             = true;
         writePin(LED_POV_PIN, 1);
-        rgb_matrix_blink_set_color(index, 0x00, 0x00, 0x00);
-        rgb_matrix_blink_set_interval_times(index, 300, 0xFF); 
     }
-
-    rgb_matrix_blink_set(index);
 }
 
 typedef enum {
@@ -219,9 +195,6 @@ void ind_set_blink(ind_status_t status) {
 }
 
 bool rgb_matrix_blink_user(blink_rgb_t *blink_rgb) {
-    if (test_white_light_flag) {
-        return false;
-    }
 
     switch (blink_rgb->index) {
         case RGB_MATRIX_BLINK_INDEX_BAT: {
@@ -277,10 +250,6 @@ bool rgb_matrix_blink_user(blink_rgb_t *blink_rgb) {
 #endif
         default: { 
             
-            if (test_white_light_flag) {
-                return false;
-            }
-            
             if (rgbrec_is_started()) {
                 return false;
             }
@@ -304,8 +273,23 @@ uint8_t hs_get_sleep_timeout(void){
     return confinfo.sleep_timeout;
 }
 
+// 把 VIA 的睡眠超时档位换算为毫秒，0 表示不自动休眠
+static uint32_t hs_sleep_timeout_ms(void) {
+    switch (hs_get_sleep_timeout()) {
+        case hs_sleep_timeout_1min:   return 1 * 60000;
+        case hs_sleep_timeout_3min:   return 3 * 60000;
+        case hs_sleep_timeout_5min:   return 5 * 60000;
+        case hs_sleep_timeout_10min:  return 10 * 60000;
+        case hs_sleep_timeout_20min:  return 20 * 60000;
+        case hs_sleep_timeout_30min:  return 30 * 60000;
+        case hs_sleep_timeout_vendor: return HS_SLEEP_TIMEOUT;
+        default:                      return 0; // hs_sleep_timeout_none
+    }
+}
+
 void hs_set_sleep_timeout(uint8_t sleep_timeout){
     confinfo.sleep_timeout = sleep_timeout;
+    lpwr_set_timeout_value(hs_sleep_timeout_ms()); // 让 VIA 设置真正生效（原来从未下发，恒为 5 分钟）
 }
 
 bool mm_get_rgb_enable(void) {
@@ -356,6 +340,7 @@ void keyboard_post_init_kb(void) {
 #endif
 
     eeconfig_confinfo_init();
+    lpwr_set_timeout_value(hs_sleep_timeout_ms()); // 应用 VIA 的睡眠超时设置
 
 #ifdef LED_POWER_EN_PIN
     gpio_set_pin_output(LED_POWER_EN_PIN);
@@ -390,11 +375,6 @@ void keyboard_post_init_kb(void) {
 #ifdef LED_MAC_PIN
     gpio_set_pin_output(LED_MAC_PIN);
     gpio_write_pin_high(LED_MAC_PIN);
-#endif
-
-#ifdef HS_LED_BOOSTING_PIN
-    gpio_set_pin_output(HS_LED_BOOSTING_PIN);
-    gpio_write_pin_high(HS_LED_BOOSTING_PIN);
 #endif
 
 #ifdef MM_BT_DEF_PIN
@@ -690,11 +670,6 @@ bool process_record_wls(uint16_t keycode, keyrecord_t *record) {
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
-    if (test_white_light_flag && record->event.pressed) {
-        test_white_light_flag = false;
-        rgb_matrix_set_color_all(0x00, 0x00, 0x00);
-    }
-
     if (*md_getp_state() == MD_STATE_CONNECTED) {
         hs_rgb_blink_set_timer(timer_read32());
     }
@@ -813,17 +788,6 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
             }
         } break;
 
-        case KC_TEST: {
-            if (rgbrec_is_started()) {
-
-                return false;
-            }
-            if (record->event.pressed) {
-                test_white_light_flag = true;
-            }
-
-            return false;
-        } break;
         case NK_TOGG: {
             if (record->event.pressed) {
                 rgb_matrix_blink_set_color(RGB_MATRIX_BLINK_INDEX_ALL, WIITE_B, 0x00, 0x00);
@@ -1105,6 +1069,14 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
             if (record->event.pressed) {
                 rk_bat_req_flag   = true;
                 hs_bat_show_timer = timer_read32();
+                // 背光被 Fn+Backspace 关闭时，临时打开 LED 供电与背光，保证电量条仍能显示，3 秒后再恢复
+                if (!mm_get_rgb_enable()) {
+                    hs_bat_force_rgb = true;
+                    rgb_matrix_enable();
+#ifdef LED_POWER_EN_PIN
+                    gpio_write_pin_high(LED_POWER_EN_PIN);
+#endif
+                }
             }
             return false;
         } break;
@@ -1135,26 +1107,27 @@ void hs_send_bat_status(void) {
         md_send_devctrl(hs_now_mode);
         md_send_devctrl(MD_SND_CMD_DEVCTRL_INQVOL);
     }
-}
-void hs_usb_charging_switch(void) {
 
-    if (charging_state) {
-        gpio_write_pin_low(HS_LED_BOOSTING_PIN);
-    } else {
-        gpio_write_pin_high(HS_LED_BOOSTING_PIN);
+    // 蓝牙下电量由无线模块直接上报给主机，需先按主机系统设置模块的上报方式，否则系统显示不准：
+    // macOS -> 0x80，Windows -> 0x81（同厂商 r75_pro 的做法），首次及系统切换时各下发一次
+    static uint8_t hs_bat_report_mode = 0xFF;
+    uint8_t        hs_now_bat_mode    = keymap_is_mac_system() ? 0x80 : 0x81;
+    if (hs_bat_report_mode != hs_now_bat_mode) {
+        hs_bat_report_mode = hs_now_bat_mode;
+        md_send_devctrl_bat(hs_now_bat_mode);
     }
 }
-
 void hs_set_sleep_state(void) {
     /* Set the sleep state of wireless mode */
     static uint8_t last_devs_mode = 0xFF; 
     if (wireless_get_current_devs() != last_devs_mode) {
         last_devs_mode = wireless_get_current_devs(); 
         
-        if (wireless_get_current_devs() == DEVS_2G4) {
-            md_send_devctrl(0x80 + HS_WIRESS_SLEEP_TIME); 
-        } else {
+        // 与 process_record_wls() 保持一致：蓝牙下发深度睡眠时间(0x80+n 分钟)，2.4G 下发 0xFF
+        if (last_devs_mode == DEVS_2G4) {
             md_send_devctrl(0xFF); 
+        } else if ((last_devs_mode >= DEVS_BT1) && (last_devs_mode <= DEVS_BT3)) {
+            md_send_devctrl(0x80 + HS_WIRESS_SLEEP_TIME); 
         }
     }
 }
@@ -1193,7 +1166,7 @@ static void hs_update_indicators(void) {
 void housekeeping_task_user(void) { // loop
 
     hs_send_bat_status();
-    hs_usb_charging_switch();
+    hs_bat_indicators_task();
     hs_rgb_blink_hook_user();
     hs_set_sleep_state();
     hs_update_indicators();
@@ -1202,6 +1175,14 @@ void housekeeping_task_user(void) { // loop
     extern bool rk_bat_req_flag;
     if (rk_bat_req_flag && timer_elapsed32(hs_bat_show_timer) > 3000) {
         rk_bat_req_flag = false;
+        // 若显示前背光是关闭的，恢复关闭状态（避免因看电量把背光一直打开）
+        if (hs_bat_force_rgb) {
+            hs_bat_force_rgb = false;
+            rgb_matrix_disable();
+#ifdef LED_POWER_EN_PIN
+            gpio_write_pin_low(LED_POWER_EN_PIN);
+#endif
+        }
     }
 }
 
@@ -1334,12 +1315,6 @@ bool hs_reset_settings_user(void) {
 
 bool rgb_matrix_indicators_advanced_kb(uint8_t led_min, uint8_t led_max) {
 
-    if (test_white_light_flag) {
-        RGB rgb_test_open = hsv_to_rgb((HSV){.h = 0, .s = 0, .v = RGB_MATRIX_VAL_STEP * 5});
-        rgb_matrix_set_color_all(rgb_test_open.r, rgb_test_open.g, rgb_test_open.b);
-
-        return false;
-    }
 #ifdef RGBLIGHT_ENABLE
     if (rgb_matrix_indicators_advanced_user(led_min, led_max) != true) {
 
@@ -1404,10 +1379,6 @@ void lpwr_wakeup_hook(void) { // wireless wakeup
 
 #ifdef LED_POWER_EN_PIN
     gpio_write_pin_high(LED_POWER_EN_PIN);
-#endif
-
-#ifdef HS_LED_BOOSTING_PIN
-    gpio_write_pin_high(HS_LED_BOOSTING_PIN);
 #endif
 }
 

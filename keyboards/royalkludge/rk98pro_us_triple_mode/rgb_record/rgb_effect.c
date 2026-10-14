@@ -218,28 +218,20 @@ void rgblight_effect_rainbow_mood(animation_status_t *anim) {
 
 bool rgblight_effect_custom_rainbow_swirl(animation_status_t *anim) {
     uint8_t hue;
-    static uint8_t i,j;
+    uint8_t num = rgblight_ranges.effect_num_leds;
 
-    for (j = 0; j < 14; j++) {
-        hue = (RGBLIGHT_RAINBOW_SWIRL_RANGE / 14 * j + anim->current_hue);
-        sethsv(hue, rgblight_config.sat, rgblight_config.val, (LED_TYPE *)&led[j + rgblight_ranges.effect_start_pos]);
-        sethsv(hue, rgblight_config.sat, rgblight_config.val, (LED_TYPE *)&led[(27-j) + rgblight_ranges.effect_start_pos]);
-    }
-
-    for (i = 28; i < 33; i++) {
-        hue = (RGBLIGHT_RAINBOW_SWIRL_RANGE / rgblight_ranges.effect_num_leds * i + anim->current_hue);
+    // 只在本段侧灯范围内取色并向中间镜像，避免硬编码索引越界（led[] 只有 RGBLED_NUM 个）
+    for (uint8_t i = 0; i < num / 2; i++) {
+        hue = (RGBLIGHT_RAINBOW_SWIRL_RANGE / num * i + anim->current_hue);
         sethsv(hue, rgblight_config.sat, rgblight_config.val, (LED_TYPE *)&led[i + rgblight_ranges.effect_start_pos]);
+        sethsv(hue, rgblight_config.sat, rgblight_config.val, (LED_TYPE *)&led[num - 1 - i + rgblight_ranges.effect_start_pos]);
     }
     rgblight_set();
 
     if (anim->delta % 2) {
-        anim->current_hue++;
-        anim->current_hue++;
-        anim->current_hue++;
+        anim->current_hue += 3;
     } else {
-        anim->current_hue--;
-        anim->current_hue--;
-        anim->current_hue--;
+        anim->current_hue -= 3;
     }
 
     return false;

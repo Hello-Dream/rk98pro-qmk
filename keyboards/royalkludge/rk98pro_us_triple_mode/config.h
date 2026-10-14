@@ -6,7 +6,6 @@
 #define USB_POWER_EN_PIN                    B1 // USB ENABLE pin
 #define LED_POWER_EN_PIN                    A5 // LED ENABLE pin
 #define HS_BAT_CABLE_PIN                    A7 // USB insertion detection pin
-#define HS_LED_BOOSTING_PIN                 B7 // LED BOOSTING,Power boost pin
 #define LED_ENABLE_ON 1
 
 #define BAT_FULL_PIN                        A15
@@ -83,13 +82,13 @@
 #define RGB_MATRIX_DEFAULT_MODE RGB_MATRIX_CYCLE_LEFT_RIGHT
 
 /* RGB Light */
-#define RGBLED_NUM 8
+#define RGBLED_NUM 6
 #define RGBLIGHT_CUSTOM_DRIVER
 #define RGBLIGHT_DISABLE_KEYCODES
 #define BREATHING_VAL           40
 #define RAINBOW_MOOD            40
 #define LED_TYPE                RGB
-#define RGBLIGHT_LED_MAP {0, 1, 2, 3, 4, 5, 6, 7}
+#define RGBLIGHT_LED_MAP {0, 1, 2, 3, 4, 5}
 
 /* Status Indicator Lamp */
 #define RGB_MATRIX_BLINK_INDEX_ALL          0xFF 

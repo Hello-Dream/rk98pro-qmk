@@ -64,9 +64,6 @@
             "key": "HS_BATQ"
         },
         {
-            "key": "KC_TEST"
-        },
-        {
             "key": "EF_PLASMA",
             "aliases": ["PLASMA"]
         },
