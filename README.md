@@ -47,24 +47,31 @@ make royalkludge/rk98pro_us_triple_mode:default
 
 ## 云端编译（GitHub Actions）
 
-仓库自带 `.github/workflows/build.yml`：push 或在 Actions 页手动触发后，会在 QMK 官方容器（`ghcr.io/qmk/qmk_cli`）里检出 `qmk/qmk_firmware`、叠加本仓库的 `keyboards/` 并编译，产物在该次运行的 **Artifacts** 里下载。
+仓库自带 `.github/workflows/build.yml`：push 或在 Actions 页手动触发后，会在 QMK 官方容器（`ghcr.io/qmk/qmk_cli`）里检出 **`yangzheng20003/qmk_firmware`**、叠加本仓库的 `keyboards/` 并编译，产物在该次运行的 **Artifacts** 里下载。
 
 > 基座使用维护者的 QMK fork **`yangzheng20003/qmk_firmware`**（它保留了本固件依赖的 `EECONFIG_USER_DATABLOCK` 等接口）；本仓库另带无线模块 `keyboards/linker/wireless/`。
 
 ## 烧录
 
-先让键盘进入 bootloader：
+### 进入 bootloader
 
-- 按住键盘 **Esc** 键再插 USB 线（会同时清除持久设置），或
-- 按住 PCB 背面的 Reset 键再插 USB 线
+本键盘**没有 Reset 按键**，按优先级任选一种：
 
-然后执行：
+1. **软复位（推荐）**：按住 `Fn` + `右Shift`，再点一下 `Esc` → 直接重启进入 bootloader。
+   （对应默认 keymap：`MO(_DEFA)` = Fn+右Shift，`_DEFA` 层左上角是 `QK_BOOT`。）
+2. **Bootmagic**：按住 `Esc` 键再插 USB 线（会同时清除持久设置）。
+3. **兜底**：拆开 PCB，找到标 `RST` / `RESET` 的两个焊盘（或圆孔），插着 USB 时短接一下。
+
+进入后设备管理器会出现 DFU 设备：**`VID:PID = 342D:DFA0`**。
+
+### 刷入
 
 ```
 make royalkludge/rk98pro_us_triple_mode:default:flash
 ```
 
-或用烧录工具刷入 `royalkludge_rk98pro_us_triple_mode_default.bin`。
+或用烧录工具（QMK Toolbox / `wb32-dfu-updater_cli`）刷入 `royalkludge_rk98pro_us_triple_mode_default.bin`。
+刷完若仍停在 DFU（`342D:DFA0`），**拔插一次 USB** 即可进入应用模式。
 
 ## VIA
 
