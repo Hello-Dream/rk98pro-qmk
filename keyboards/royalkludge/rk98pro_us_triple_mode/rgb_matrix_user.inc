@@ -34,10 +34,10 @@ static bool HS_PLASMA(effect_params_t *params) {
         uint8_t v = sin8(x * 8 + time);
         v         = qadd8(v, sin8(y * 8 + (time >> 1)));
         v         = qadd8(v, sin8(((x + y) * 4) + (time / 3)));
-        hsv_t hsv = rgb_matrix_config.hsv;
+        HSV hsv = rgb_matrix_config.hsv;
         hsv.h += v;
         hsv.v = scale8(v, hsv.v);
-        rgb_t rgb = hsv_to_rgb(hsv);
+        RGB rgb = hsv_to_rgb(hsv);
         rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
     }
     return rgb_matrix_check_finished_leds(led_max);
@@ -59,10 +59,10 @@ static bool HS_SPARKLE(effect_params_t *params) {
         uint8_t phase = (uint8_t)(i * 97 + (uint16_t)i * i * 13);
         uint8_t v     = sin8(time + phase);
         v             = scale8(v, v); // 收窄成尖峰才像星星
-        hsv_t hsv     = rgb_matrix_config.hsv;
+        HSV hsv     = rgb_matrix_config.hsv;
         hsv.h += (uint8_t)(i * 37);
         hsv.v = scale8(v, hsv.v);
-        rgb_t rgb = hsv_to_rgb(hsv);
+        RGB rgb = hsv_to_rgb(hsv);
         rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
     }
     return rgb_matrix_check_finished_leds(led_max);
@@ -92,9 +92,9 @@ static bool HS_RIPPLE(effect_params_t *params) {
             uint16_t ring   = (dist > radius) ? (dist - radius) : (radius - dist);
             if (ring < 24) acc += (24 - ring) * 8;
         }
-        hsv_t hsv = rgb_matrix_config.hsv;
+        HSV hsv = rgb_matrix_config.hsv;
         hsv.v     = scale8((uint8_t)(acc > 255 ? 255 : acc), hsv.v);
-        rgb_t rgb = hsv_to_rgb(hsv);
+        RGB rgb = hsv_to_rgb(hsv);
         rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
     }
     return rgb_matrix_check_finished_leds(led_max);
@@ -115,10 +115,10 @@ static bool HS_BREATH_GRADIENT(effect_params_t *params) {
     uint8_t breathe = sin8(time);
     for (uint8_t i = led_min; i < led_max; i++) {
         RGB_MATRIX_TEST_LED_FLAGS();
-        hsv_t hsv = rgb_matrix_config.hsv;
+        HSV hsv = rgb_matrix_config.hsv;
         hsv.h += g_led_config.point[i].x;
         hsv.v = scale8(breathe, hsv.v);
-        rgb_t rgb = hsv_to_rgb(hsv);
+        RGB rgb = hsv_to_rgb(hsv);
         rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
     }
     return rgb_matrix_check_finished_leds(led_max);
@@ -144,11 +144,11 @@ static bool HS_FIRE(effect_params_t *params) {
         flick         = qadd8(flick, sin8(y * 7 + (time >> 1)));
         flick         = scale8(flick, flick);
         uint8_t heat  = qsub8(base, flick >> 1);
-        hsv_t hsv     = rgb_matrix_config.hsv;
+        HSV hsv     = rgb_matrix_config.hsv;
         hsv.h = scale8(heat, 40); // 红 -> 橙黄
         hsv.s = 255;
         hsv.v = scale8(heat, hsv.v);
-        rgb_t rgb = hsv_to_rgb(hsv);
+        RGB rgb = hsv_to_rgb(hsv);
         rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
     }
     return rgb_matrix_check_finished_leds(led_max);
@@ -177,11 +177,11 @@ static bool HS_CYBER_SCAN(effect_params_t *params) {
         } else if (d < 46) {
             v = (uint8_t)(255 - (uint16_t)(d - 6) * 255 / 40); // 拖尾渐隐
         }
-        hsv_t hsv = rgb_matrix_config.hsv;
+        HSV hsv = rgb_matrix_config.hsv;
         hsv.h += 128; // 青蓝系
         hsv.s = 255;
         hsv.v = scale8(v, hsv.v);
-        rgb_t rgb = hsv_to_rgb(hsv);
+        RGB rgb = hsv_to_rgb(hsv);
         rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
     }
     return rgb_matrix_check_finished_leds(led_max);
@@ -214,9 +214,9 @@ static bool HS_RAINDROPS(effect_params_t *params) {
                 v = (uint8_t)(255 - (uint16_t)(d - 4) * 255 / 16);
             }
         }
-        hsv_t hsv = rgb_matrix_config.hsv;
+        HSV hsv = rgb_matrix_config.hsv;
         hsv.v = scale8(v, hsv.v);
-        rgb_t rgb = hsv_to_rgb(hsv);
+        RGB rgb = hsv_to_rgb(hsv);
         rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
     }
     return rgb_matrix_check_finished_leds(led_max);
