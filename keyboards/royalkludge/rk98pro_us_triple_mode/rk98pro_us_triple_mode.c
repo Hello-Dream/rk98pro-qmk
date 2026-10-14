@@ -364,22 +364,27 @@ void keyboard_post_init_kb(void) {
 
 #ifdef LED_NUM_PIN
     gpio_set_pin_output(LED_NUM_PIN);
+    gpio_write_pin_high(LED_NUM_PIN); // 亮=低电平，先置高=灭
 #endif
 
 #ifdef LED_CAPS_PIN
     gpio_set_pin_output(LED_CAPS_PIN);
+    gpio_write_pin_high(LED_CAPS_PIN);
 #endif
 
 #ifdef LED_SCROLL_PIN
     gpio_set_pin_output(LED_SCROLL_PIN);
+    gpio_write_pin_high(LED_SCROLL_PIN);
 #endif
 
 #ifdef LED_WIN_PIN
     gpio_set_pin_output(LED_WIN_PIN);
+    gpio_write_pin_high(LED_WIN_PIN);
 #endif
 
 #ifdef LED_POV_PIN
     gpio_set_pin_output(LED_POV_PIN);
+    gpio_write_pin_high(LED_POV_PIN);
 #endif
 
 #ifdef LED_MAC_PIN
@@ -1154,12 +1159,44 @@ void hs_set_sleep_state(void) {
     }
 }
 
+// 指示灯：Caps/Num/Scroll/Win 只在对应锁开启时点亮（主循环每轮刷新，不依赖 RGB 渲染）
+static void hs_update_indicators(void) {
+    if (rgbrec_is_started() || ind_status != ind_state_none) return;
+
+    if (host_keyboard_led_state().caps_lock) {
+        writePin(LED_CAPS_PIN, LED_PIN_ON_STATE);
+    } else {
+        writePin(LED_CAPS_PIN, !LED_PIN_ON_STATE);
+    }
+
+    if (host_keyboard_led_state().num_lock) {
+        writePin(LED_NUM_PIN, LED_PIN_ON_STATE);
+    } else {
+        writePin(LED_NUM_PIN, !LED_PIN_ON_STATE);
+    }
+
+    if (host_keyboard_led_state().scroll_lock) {
+        writePin(LED_SCROLL_PIN, LED_PIN_ON_STATE);
+    } else {
+        writePin(LED_SCROLL_PIN, !LED_PIN_ON_STATE);
+    }
+
+    if (!bat_char) {
+        if (!keymap_is_mac_system() && keymap_config.no_gui) {
+            writePin(LED_WIN_PIN, LED_PIN_ON_STATE);
+        } else {
+            writePin(LED_WIN_PIN, !LED_PIN_ON_STATE);
+        }
+    }
+}
+
 void housekeeping_task_user(void) { // loop
 
     hs_send_bat_status();
     hs_usb_charging_switch();
     hs_rgb_blink_hook_user();
     hs_set_sleep_state();
+    hs_update_indicators();
 
     // 电量条显示约 3 秒后自动关掉
     extern bool rk_bat_req_flag;
@@ -1315,27 +1352,8 @@ bool rgb_matrix_indicators_advanced_kb(uint8_t led_min, uint8_t led_max) {
         ee_clr_timer = 0;
     }
 
-    if (!rgbrec_is_started() && ind_status == ind_state_none) {
-        if (host_keyboard_led_state().caps_lock)
-            writePin(LED_CAPS_PIN, LED_PIN_ON_STATE);
-        else 
-            writePin(LED_CAPS_PIN, !LED_PIN_ON_STATE);
-
-        if (!keymap_is_mac_system() && keymap_config.no_gui && !bat_char)
-            writePin(LED_WIN_PIN, LED_PIN_ON_STATE);
-        else if (!bat_char)
-            writePin(LED_WIN_PIN, !LED_PIN_ON_STATE);
-
-        if (host_keyboard_led_state().num_lock)
-            writePin(LED_NUM_PIN, LED_PIN_ON_STATE);
-        else 
-            writePin(LED_NUM_PIN, !LED_PIN_ON_STATE);
-
-        if (host_keyboard_led_state().scroll_lock)
-            writePin(LED_SCROLL_PIN, LED_PIN_ON_STATE);
-        else 
-            writePin(LED_SCROLL_PIN, !LED_PIN_ON_STATE);
-    }
+    // 指示灯（Caps/Num/Scroll/Win）已移到 housekeeping_task_user() 里每轮刷新，
+    // 避免 RGB 渲染未运行时引脚卡在某个状态（厂商原版也是在主循环里驱动）。
 
 #ifdef RGBLIGHT_ENABLE    
     if (rgb_matrix_indicators_advanced_rgblight(led_min, led_max) != true) {
