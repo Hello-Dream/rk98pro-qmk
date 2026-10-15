@@ -11,6 +11,10 @@
 
 此处记录尚未发布的变更。发布时把内容归入新的版本号段落，并同步 `keyboard.json` 的 `version` 字段与 GitHub Release tag。
 
+### 修复
+
+- VIA 定义的 `keycodes` 由兼容回退值 `qmk_lighting` 改为显式模块 `qmk_rgb_matrix_keycodes`，消除 VIA 的 `lighting subsystem cannot be determined` 警告，键码列表只显示 RGB Matrix 的 `RM_*`，不再混入无关的 `UG_*`。
+
 ## [1.0.0] - 2026-10-15
 
 首个正式发布版本。基于厂商原版固件行为对齐，提供完整三模支持、RGB Matrix 背光、自定义灯效与按键 RGB 录制。
