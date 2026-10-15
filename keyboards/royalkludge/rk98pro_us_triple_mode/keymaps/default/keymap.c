@@ -28,8 +28,8 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
         _______,   RP_P0,     RP_P1,    RP_P2,    EF_PLASMA, EF_SPARKLE, EF_RIPPLE, EF_BREATH, EF_FIRE, EF_SCAN, EF_RAIN, _______,  _______,  RGB_TOG,             _______,  _______,  _______, _______,
         _______,   KC_BT1,    KC_BT2,   KC_BT3,   _______,  _______,  _______,  _______,  _______, MO(_DEFA),   KC_2G4,   _______,   _______,  _______,             _______,  _______,  _______, _______,
         _______,   KC_NO,     TO(_MBL), _______,  _______,  _______,  _______,  _______,  _______, MO(_DEFA),   _______,  _______,             HS_BATQ,             _______,  _______,  _______,  
-        _______,   DEB_TOG,   _______,  _______,  _______,  NK_TOGG,  _______,  _______,  _______, _______,     _______,             MO(_DEFA),           RM_VALU,  _______,  _______,  _______, _______,  
-        _______,   GU_TOGG,   _______,                       EE_CLR,                               _______,     _______,             _______,  RM_SPDD,   RM_VALD,  RM_SPDU,  _______,  _______         ),
+        _______,   DEB_TOG,   _______,  _______,  _______,  NK_TOGG,  _______,  _______,  _______, _______,     _______,             MO(_DEFA),           RGB_VAI,  _______,  _______,  _______, _______,  
+        _______,   GU_TOGG,   _______,                       EE_CLR,                               _______,     _______,             _______,  RGB_SPD,   RGB_VAD,  RGB_SPI,  _______,  _______         ),
 
     [_MBL] = LAYOUT( /* Base */
         KC_ESC,   KC_F1,    KC_F2,    KC_F3,    KC_F4,      KC_F5,    KC_F6,    KC_F7,    KC_F8,    KC_F9,    KC_F10,   KC_F11 ,  KC_F12,   KC_PSCR,  KC_DEL,    KC_HOME,   KC_INS ,   KC_PGUP, KC_PGDN,  
@@ -40,12 +40,12 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
         KC_LCTL,  KC_LALT,  KC_LGUI,                        KC_SPC,                                 KC_RGUI,  MO(_MFL),           KC_RCTL,  KC_LEFT,  KC_DOWN,   KC_RGHT,   KC_P0,     KC_PDOT        ),
 
     [_MFL] = LAYOUT( /* Base */
-        _______,   KC_BRID,   KC_BRIU,  LCTL(KC_UP),LGUI(KC_D),  RM_VALD,  RM_VALU,  KC_MPRV,  KC_MPLY,  KC_MNXT,    KC_MUTE,  KC_VOLD,   KC_VOLU,  RGB_MOD,   RGB_HUI,  RP_END,  KC_SCRL,  KC_PAUSE, KC_END,
+        _______,   KC_BRID,   KC_BRIU,  LCTL(KC_UP),LGUI(KC_D),  RGB_VAD,  RGB_VAI,  KC_MPRV,  KC_MPLY,  KC_MNXT,    KC_MUTE,  KC_VOLD,   KC_VOLU,  RGB_MOD,   RGB_HUI,  RP_END,  KC_SCRL,  KC_PAUSE, KC_END,
         _______,   RP_P0,     RP_P1,    RP_P2,      EF_PLASMA, EF_SPARKLE, EF_RIPPLE, EF_BREATH, EF_FIRE, EF_SCAN, EF_RAIN, _______,  _______,   RGB_TOG,             _______,  _______,  _______, _______,
         _______,   KC_BT1,    KC_BT2,   KC_BT3,     _______,     _______,  _______,  _______,  _______, MO(_DEFA),   KC_2G4,   _______,   _______,  _______,             _______,  _______,  _______, _______,
         _______,   TO(_BL),   KC_NO,    _______,    _______,     _______,  _______,  _______,  _______, MO(_DEFA),   _______,  _______,             HS_BATQ,             _______,  _______,  _______,  
-        _______,   DEB_TOG,   _______,  _______,    _______,     NK_TOGG,  _______,  _______,  _______, _______,     _______,             MO(_DEFA),           RM_VALU,  _______,  _______,  _______, _______,  
-        _______,   _______,   _______,                           EE_CLR,                                _______,     _______,             _______,  RM_SPDD,   RM_VALD,  RM_SPDU,  _______,  _______         ),
+        _______,   DEB_TOG,   _______,  _______,    _______,     NK_TOGG,  _______,  _______,  _______, _______,     _______,             MO(_DEFA),           RGB_VAI,  _______,  _______,  _______, _______,  
+        _______,   _______,   _______,                           EE_CLR,                                _______,     _______,             _______,  RGB_SPD,   RGB_VAD,  RGB_SPI,  _______,  _______         ),
 
     [_DEFA] = LAYOUT( /* Base */ 
         QK_BOOT,  _______,   _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,   _______, _______,  _______, _______,  _______,

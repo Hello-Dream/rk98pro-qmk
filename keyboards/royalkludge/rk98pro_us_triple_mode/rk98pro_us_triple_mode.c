@@ -832,25 +832,28 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
             }
             return false;
         } break;
-        case RM_SPDU: {
+        case RGB_SPI: { // Fn+右方向键：提速（原厂参数：SPD_STEP*5=满速时提示；提速由 QMK 在松开时执行）
             if (rgbrec_is_started()) return false;
             if (record->event.pressed) {
-                if (rgb_matrix_get_speed() >= (55 + RGB_MATRIX_SPD_STEP * 4)) {
+                if (rgb_matrix_get_speed() >= (RGB_MATRIX_SPD_STEP * 5)) {
                     ind_set_blink(ind_state_blink3);
                 }
             }
         } break;
-        case RM_SPDD: {
+        case RGB_SPD: { // Fn+左方向键：减速（原厂参数；修复松开时越界再减一档的问题）
             if (rgbrec_is_started()) return false;
             if (record->event.pressed) {
-                if (rgb_matrix_get_speed() <= (55 + RGB_MATRIX_SPD_STEP*1)) {
+                if (rgb_matrix_get_speed() <= RGB_MATRIX_SPD_STEP) {
                     ind_set_blink(ind_state_blink3);
-                    rgb_matrix_set_speed(55 + (RGB_MATRIX_SPD_STEP*0));
-                    return false;
                 }
+            } else if (rgb_matrix_get_speed() <= RGB_MATRIX_SPD_STEP) {
+                // QMK 在“松开”时才真正减速：已在最低档时拦截这次松开并归位，
+                // 避免松手后又多减一档越界（修复前会掉到 0）
+                rgb_matrix_set_speed(RGB_MATRIX_SPD_STEP);
+                return false;
             }
         } break;
-        case RM_VALU: {
+        case RGB_VAI: {
             if (rgbrec_is_started()) return false;
             if (record->event.pressed) {
                 if (!mm_get_rgb_enable()) {
@@ -877,7 +880,7 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
             }
             return false;
         } break;
-        case RM_VALD: {
+        case RGB_VAD: {
             if (rgbrec_is_started()) return false;
             if (record->event.pressed) {
                 if (rgb_matrix_get_val() <= RGB_MATRIX_VAL_STEP) {
