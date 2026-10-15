@@ -5,7 +5,11 @@
 > [!WARNING]
 > **本固件的持久化设置（EEPROM / `confinfo`）存储结构与厂商原版固件不同，且不含版本号与校验。**
 > 从厂商原版固件或旧版本升级时，**必须清空一次 EEPROM**，否则可能出现睡眠超时档位错乱、侧灯模式 / 颜色异常、按键 RGB 录制动效跳错甚至背光全灭。
-> 清空方式见 [README.md](README.md#-升级注意必须清空-eepromenteecle)。
+> 清空方式见 [README.md](README.md#upgrade-eeprom)。
+
+## [Unreleased]
+
+此处记录尚未发布的变更。发布时把内容归入新的版本号段落，并同步 `keyboard.json` 的 `version` 字段与 GitHub Release tag。
 
 ## [1.0.0] - 2026-10-15
 

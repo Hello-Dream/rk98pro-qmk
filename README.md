@@ -10,11 +10,28 @@ Royal Kludge **RK98PRO**（QMK 路径 `royalkludge/rk98pro_us_triple_mode`）的
 - 支持 VIA 改键、按键 RGB 录制
 - 去抖固定 **10ms**（已移除 1ms 低延迟模式，避免连击）
 
+## 下载固件
+
+最新正式版：**[v1.0.0](https://github.com/Hello-Dream/rk98pro-qmk/releases/latest)**（版本号以 Releases 页为准）
+
+| 文件 | 用途 |
+| --- | --- |
+| `royalkludge_rk98pro_us_triple_mode_default.bin` | 刷入键盘的固件 |
+| `rk98pro_us_triple_mode.json` | VIA 定义，可在 VIA 中直接加载 |
+
+两个文件都在 [Releases 下载页](https://github.com/Hello-Dream/rk98pro-qmk/releases/latest)的附件里，公开可下载；每次构建的产物也可从 [Actions 的 Artifacts](https://github.com/Hello-Dream/rk98pro-qmk/actions/workflows/build.yml) 获取（需登录 GitHub）。
+
+> ⚠️ 从厂商原版固件或旧版本升级，**必须先清空一次 EEPROM**，详见下方[升级注意](#upgrade-eeprom)。
+
+变更记录见 [CHANGELOG.md](CHANGELOG.md)。
+
 ## 目录结构
 
 ```
 .
 ├── README.md
+├── CHANGELOG.md                # 版本变更记录
+├── RELEASE_NOTES.md            # v1.0.0 发布说明（GitHub Release 正文）
 ├── LICENSE
 ├── .gitignore
 ├── .gitattributes
@@ -74,6 +91,8 @@ make royalkludge/rk98pro_us_triple_mode:default:flash
 刷完若仍停在 DFU（`342D:DFA0`），**拔插一次 USB** 即可进入应用模式。
 
 ## ⚠️ 升级注意：必须清空 EEPROM（EE_CLR）
+
+<a id="upgrade-eeprom"></a>
 
 本固件持久化设置（`confinfo`）的存储结构与厂商原版**不同**，且没有版本号/校验。**从厂商原版固件（或更早的旧版本）升级后，请务必清空一次 EEPROM**，否则可能出现：
 
