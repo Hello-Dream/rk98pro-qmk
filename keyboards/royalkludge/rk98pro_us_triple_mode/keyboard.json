@@ -2,6 +2,7 @@
     "manufacturer": "RK",
     "keyboard_name": "RK98PRO",
     "maintainer": "yangzheng20003",
+    "version": "1.0.0",
     "bootloader": "wb32-dfu",
     "bootmagic": {
         "matrix": [0, 0]
