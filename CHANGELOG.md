@@ -13,6 +13,7 @@
 
 ### 修复
 
+- VIA 的 Lighting → Color 控件改为始终显示（仅 All Off 时隐藏）。原条件把 Ripple(24) 与 Raindrops(28) 一并隐藏，但这两个自定义效果的颜色取自 `rgb_matrix_config.hsv`，基色完全可调，导致 VIA 里改不了色；条件里的 29 / 32 越界，永远为真。
 - VIA 定义的 `keycodes` 由兼容回退值 `qmk_lighting` 改为显式模块 `qmk_rgb_matrix_keycodes`，消除 VIA 的 `lighting subsystem cannot be determined` 警告，键码列表只显示 RGB Matrix 的 `RM_*`，不再混入无关的 `UG_*`。
 
 ## [1.0.0] - 2026-10-15
