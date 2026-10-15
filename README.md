@@ -111,6 +111,10 @@ make royalkludge/rk98pro_us_triple_mode:default:flash
 - 背光开关快捷键：**Fn+Backspace**（Windows `_FL` / macOS `_MFL`）。
 - **电量显示**：按一下 **Fn+Enter**（`HS_BATQ`）→ 点亮 LED 64–73 共 10 颗电量灯，约 3 秒后自动熄灭（有线 / 无线均可用）。
 
+## 快捷键
+
+完整的 Fn 组合键与使用说明（无线连接、灯光、RGB 录制、电量、刷机等）见 [快捷键说明.md](快捷键说明.md)。
+
 ## 许可
 
 GPL-2.0-or-later，详见 [LICENSE](LICENSE)。
