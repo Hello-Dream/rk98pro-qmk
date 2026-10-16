@@ -9,10 +9,11 @@ Royal Kludge **RK98PRO**（QMK 路径 `royalkludge/rk98pro_us_triple_mode`）的
 - 灯效：20 个经典内置动效 + 7 个自定义效果（`HS_*`）+ 按键 RGB 录制
 - 支持 VIA 改键、按键 RGB 录制
 - 去抖固定 **10ms**（已移除 1ms 低延迟模式，避免连击）
+- 防连击：`Fn + Z` 开 / 关「短按键过滤」（同键松开后 20ms 内的重复按下会被忽略）
 
 ## 下载固件
 
-最新正式版：**[v1.0.0](https://github.com/Hello-Dream/rk98pro-qmk/releases/latest)**（版本号以 Releases 页为准）
+最新正式版：**[v1.1.0](https://github.com/Hello-Dream/rk98pro-qmk/releases/latest)**（版本号以 Releases 页为准）
 
 | 文件 | 用途 |
 | --- | --- |
@@ -31,7 +32,7 @@ Royal Kludge **RK98PRO**（QMK 路径 `royalkludge/rk98pro_us_triple_mode`）的
 .
 ├── README.md
 ├── CHANGELOG.md                # 版本变更记录
-├── RELEASE_NOTES.md            # v1.0.0 发布说明（GitHub Release 正文）
+├── RELEASE_NOTES.md            # v1.1.0 发布说明（GitHub Release 正文）
 ├── LICENSE
 ├── .gitignore
 ├── .gitattributes

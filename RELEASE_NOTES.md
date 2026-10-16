@@ -1,6 +1,21 @@
-# RK98PRO 三模 QMK 固件 v1.0.0
+# RK98PRO 三模 QMK 固件 v1.1.0
 
-Royal Kludge **RK98PRO**（98 键 / 100 配列）的 QMK 固件首个正式版本，支持 USB / 蓝牙 ×3 / 2.4G 三模、RGB Matrix 背光、按键 RGB 录制与 VIA 改键。
+Royal Kludge **RK98PRO**（98 键 / 100 配列）的 QMK 固件，支持 USB / 蓝牙 ×3 / 2.4G 三模、RGB Matrix 背光、按键 RGB 录制与 VIA 改键。
+
+本版本在 v1.0.0 基础上新增「短按键过滤」（防连击），并修复 VIA 的 Color 控件与 keycodes 定义问题。
+
+---
+
+## 本版本更新（v1.1.0）
+
+### 新增
+
+- `Fn + Z` 开关「短按键过滤」（防连击）：开启后，某个物理键松开后 20ms 内再次按下会被忽略，用于压掉偶发的双击/连击。开关状态存入 EEPROM，切换时对应指示灯白闪 3 次（开）/ 红闪 3 次（关）。
+
+### 修复
+
+- VIA 的 Lighting → Color 控件改为始终显示（仅 All Off 时隐藏），Ripple / Raindrops 等自定义效果现在可在 VIA 中改色。
+- VIA 定义的 `keycodes` 改用显式模块 `qmk_rgb_matrix_keycodes`，消除 `lighting subsystem cannot be determined` 警告。
 
 ---
 
@@ -56,13 +71,14 @@ make royalkludge/rk98pro_us_triple_mode:default:flash
 - 电量显示：`Fn + Enter` 点亮约 3 秒，低于 30% 显示红色。
 - 双布局：`Fn + S` 切 macOS 布局，`Fn + A` 切回 Windows 布局，掉电不丢。
 - 全键无冲：`Fn + B` 切换；Win 键锁定：`Fn + 左Win`。
+- 防连击：`Fn + Z` 开关「短按键过滤」（同键松开后 20ms 内重复按下会被忽略），状态掉电不丢。
 
 完整 Fn 组合键列表见 [快捷键说明.md](https://github.com/Hello-Dream/rk98pro-qmk/blob/main/%E5%BF%AB%E6%8D%B7%E9%94%AE%E8%AF%B4%E6%98%8E.md)。
 
 ## 已知限制
 
 - 去抖固定 **10ms**（为避免连击，已移除 1ms 低延迟模式）。
-- `Fn + Z` 为预留键（原低延迟开关，功能已移除），可在 VIA 中改绑。
+- 防连击：`Fn + Z` 开 / 关「短按键过滤」（同键松开后 20ms 内的重复按下会被忽略）；窗口为编译期常量，如需更强可调大。
 - 编译依赖维护者的 QMK fork `yangzheng20003/qmk_firmware`（保留本固件依赖的 `EECONFIG_USER_DATABLOCK` 等接口），CI 已固定该基座。
 
 ## 许可

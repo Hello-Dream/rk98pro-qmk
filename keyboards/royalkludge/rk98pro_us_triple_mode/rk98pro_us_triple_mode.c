@@ -28,6 +28,30 @@ typedef union {
 } confinfo_t;
 confinfo_t confinfo;
 
+/* 短按键过滤（防连击）：某个物理键松开后的 HS_SKF_LOCKOUT_MS 内忽略该键再次按下；
+ * 被忽略的那次按下，其对应的“松开”也会一并吞掉，避免向动作系统发出孤儿松开。
+ * 由 Fn+Z 开关，状态存 confinfo.DEB_flag。 */
+#define HS_SKF_LOCKOUT_MS 20 // 锁定窗口：短于人手同键连打的最快间隔，只挡机械抖动
+
+static uint16_t hs_skf_release[MATRIX_ROWS][MATRIX_COLS]; // 各物理键最近一次松开时刻（timer_read）
+static bool     hs_skf_dropped[MATRIX_ROWS][MATRIX_COLS]; // 该键当前这次按下被丢弃，松开时需吞掉
+
+// 清空锁定记录（重置设置或关闭过滤时调用）
+static void hs_skf_reset(void) {
+    uint16_t stale = timer_read() - (HS_SKF_LOCKOUT_MS + 1); // 让首次判断一定落在窗口外
+    for (uint8_t r = 0; r < MATRIX_ROWS; r++) {
+        for (uint8_t c = 0; c < MATRIX_COLS; c++) {
+            hs_skf_release[r][c] = stale;
+            hs_skf_dropped[r][c] = false;
+        }
+    }
+}
+
+// 该物理键是否刚松开、仍处于锁定窗口内（true 表示这次按下应被忽略）
+static bool hs_skf_is_locked(keypos_t pos) {
+    return timer_elapsed(hs_skf_release[pos.row][pos.col]) < HS_SKF_LOCKOUT_MS;
+}
+
 typedef struct {
     bool active;
     uint32_t timer;
@@ -428,6 +452,7 @@ void keyboard_post_init_kb(void) {
     start_hsv = rgb_matrix_get_hsv();
 
     hs_deb = DEBOUNCE;
+    hs_skf_reset();
 
     // 内置动效已全部移除：若 EEPROM 里存的动效号越界，回落到默认动效
     if (rgb_matrix_config.mode >= RGB_MATRIX_EFFECT_MAX) {
@@ -667,6 +692,41 @@ bool process_record_wls(uint16_t keycode, keyrecord_t *record) {
     return false;
 }
 #endif
+
+/* 短按键过滤：在按键进入处理流程前拦下「刚松开又立刻按下」的同一物理键。
+ * 只对普通字符键与修饰键生效，Fn 组合 / 自定义键一律直通。 */
+bool pre_process_record_kb(uint16_t keycode, keyrecord_t *record) {
+    if (!confinfo.DEB_flag || !IS_KEYEVENT(record->event)) {
+        return true;
+    }
+    if (!(IS_BASIC_KEYCODE(keycode) || IS_MODIFIER_KEYCODE(keycode))) {
+        return true;
+    }
+    if (rgbrec_is_started()) { // 录制按键 RGB 时不拦截，否则录制中按键改色会失灵
+        return true;
+    }
+    if (record->event.key.row >= MATRIX_ROWS || record->event.key.col >= MATRIX_COLS) {
+        return true;
+    }
+
+    uint8_t row = record->event.key.row;
+    uint8_t col = record->event.key.col;
+
+    if (record->event.pressed) {
+        if (hs_skf_is_locked(record->event.key)) {
+            hs_skf_dropped[row][col] = true; // 记下，等它松开时一并吞掉
+            return false;                    // 仍在锁定窗口内：丢弃这次按下
+        }
+        return true;
+    }
+
+    hs_skf_release[row][col] = timer_read(); // 松开：开启新一轮锁定窗口
+    if (hs_skf_dropped[row][col]) {
+        hs_skf_dropped[row][col] = false;
+        return false; // 被丢弃按下的“松开”，直接吞掉
+    }
+    return true;
+}
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
@@ -1034,7 +1094,19 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
 
             return true;
         } break;
-        case DEB_TOG: { // 低延迟去抖模式已移除，此键不再改变去抖
+        case DEB_TOG: { // Fn+Z：开 / 关「短按键过滤」（防连击）
+            if (record->event.pressed) {
+                confinfo.DEB_flag = !confinfo.DEB_flag;
+                if (!confinfo.DEB_flag) {
+                    hs_skf_reset(); // 关闭时清掉锁定状态
+                }
+                eeconfig_confinfo_update();
+
+                // 指示灯：开 = 白闪 3 次，关 = 红闪 3 次
+                rgb_matrix_blink_set_color(IM_MM_RGB_BLINK_INDEX_DEB, confinfo.DEB_flag ? WIITE_B : 0xFF, confinfo.DEB_flag ? WIITE_B : 0x00, confinfo.DEB_flag ? WIITE_B : 0x00);
+                rgb_matrix_blink_set_interval_times(IM_MM_RGB_BLINK_INDEX_DEB, 250, 3);
+                rgb_matrix_blink_set(IM_MM_RGB_BLINK_INDEX_DEB);
+            }
             return false;
         } break;
 #ifdef RGB_MATRIX_ENABLE
