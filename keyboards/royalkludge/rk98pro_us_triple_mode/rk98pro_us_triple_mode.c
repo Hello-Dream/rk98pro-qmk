@@ -85,6 +85,9 @@ static bool linker_ok        = false;
 uint32_t hs_suspend_timer    = 0;
 static uint32_t hs_bat_show_timer = 0;
 static bool hs_bat_force_rgb     = false; // 背光原本关闭时，为显示电量条临时点亮的标记
+static bool hs_wls_force_rgb     = false; // 背光原本关闭时，为显示无线连接指示临时点亮的标记
+static uint32_t hs_wls_force_timer = 0;   // 最近一次通道指示动画时刻（用于清理残留闪烁计时）
+static uint32_t hs_connect_ok_time = 0;   // 连接成功时刻（用于 HS_SUCCEED_TIME 内的常亮提示）
 uint16_t hs_deb              = DEBOUNCE;
 bool im_test_rate_flag;
 HSV start_hsv;
@@ -97,6 +100,7 @@ void hs_bat_indicators_task(void);
 void ind_indicators_hook(uint8_t index);
 void nkr_indicators_hook(uint8_t index);
 void hs_rgb_blink_hook_user(void);
+void hs_wls_indicator_force_task(void);
 
 blink_rgb_t blink_rgbs[RGB_MATRIX_BLINK_COUNT] = {
     {.index = HS_RGB_BLINK_INDEX_WIN, .interval = 250, .times = 1, .color = {.r = 0xFF, .g = 0xFF, .b = 0xFF}, .blink_cb = NULL},
@@ -324,6 +328,32 @@ bool mm_get_rgb_enable(void) {
 void mm_set_rgb_enable(bool state) {
     confinfo.hs_rgb_tog_flag = state;
     eeconfig_confinfo_update();
+}
+
+// 背光关闭时为状态灯临时打开 RGB 与 LED 供电（不写 EEPROM，用户设置仍以 confinfo 为准）
+static void hs_indicator_rgb_acquire(void) {
+    if (mm_get_rgb_enable()) return;
+    if (!rgb_matrix_is_enabled()) rgb_matrix_enable_noeeprom();
+#ifdef LED_POWER_EN_PIN
+    gpio_write_pin_high(LED_POWER_EN_PIN);
+#endif
+}
+
+// 状态灯都显示完后恢复关闭；电量条或连接指示仍在用时保持点亮
+static void hs_indicator_rgb_release(void) {
+    if (mm_get_rgb_enable()) return; // 用户已手动打开背光，保持现状
+    if (hs_bat_force_rgb || hs_wls_force_rgb) return;
+    rgb_matrix_disable_noeeprom();
+#ifdef LED_POWER_EN_PIN
+    gpio_write_pin_low(LED_POWER_EN_PIN);
+#endif
+}
+
+// 无线连接指示需要显示时调用：背光关闭则临时点亮
+static void hs_wls_indicator_force_begin(void) {
+    if (mm_get_rgb_enable() || rgb_matrix_is_enabled()) return;
+    hs_wls_force_rgb = true;
+    hs_indicator_rgb_acquire();
 }
 
 void eeconfig_confinfo_default(void) {
@@ -820,6 +850,9 @@ void im_rgblight_increase(void) {
 // 选择自定义灯效前先确保背光已打开
 static void hs_rgb_select_effect(uint8_t mode) {
     rgb_matrix_enable();
+    if (!mm_get_rgb_enable()) {
+        mm_set_rgb_enable(true); // 同步用户设置，避免临时状态灯结束后误关背光
+    }
     rgb_matrix_mode(mode);
 #    ifdef LED_POWER_EN_PIN
     gpio_write_pin_high(LED_POWER_EN_PIN);
@@ -1147,10 +1180,7 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
                 // 背光被 Fn+Backspace 关闭时，临时打开 LED 供电与背光，保证电量条仍能显示，3 秒后再恢复
                 if (!mm_get_rgb_enable()) {
                     hs_bat_force_rgb = true;
-                    rgb_matrix_enable();
-#ifdef LED_POWER_EN_PIN
-                    gpio_write_pin_high(LED_POWER_EN_PIN);
-#endif
+                    hs_indicator_rgb_acquire();
                 }
             }
             return false;
@@ -1240,9 +1270,18 @@ static void hs_update_indicators(void) {
 
 void housekeeping_task_user(void) { // loop
 
+    // 用户中途打开背光时，临时状态灯标记直接失效，避免后续误关背光
+    if (mm_get_rgb_enable()) {
+        hs_bat_force_rgb = false;
+        hs_wls_force_rgb = false;
+    }
+
     hs_send_bat_status();
     hs_bat_indicators_task();
     hs_rgb_blink_hook_user();
+#if defined(WIRELESS_ENABLE) && defined(RGB_MATRIX_ENABLE)
+    hs_wls_indicator_force_task();
+#endif
     hs_set_sleep_state();
     hs_update_indicators();
 
@@ -1253,10 +1292,7 @@ void housekeeping_task_user(void) { // loop
         // 若显示前背光是关闭的，恢复关闭状态（避免因看电量把背光一直打开）
         if (hs_bat_force_rgb) {
             hs_bat_force_rgb = false;
-            rgb_matrix_disable();
-#ifdef LED_POWER_EN_PIN
-            gpio_write_pin_low(LED_POWER_EN_PIN);
-#endif
+            hs_indicator_rgb_release();
         }
     }
 }
@@ -1272,6 +1308,9 @@ uint32_t wls_rgb_indicator_index    = 0;
 RGB wls_rgb_indicator_rgb           = {0};
 
 void rgb_matrix_wls_indicator_set(uint8_t index, RGB rgb, uint32_t interval, uint8_t times) {
+
+    hs_wls_force_timer = timer_read32();
+    hs_wls_indicator_force_begin(); // 背光关闭时也要显示连接/配对指示
 
     wls_rgb_indicator_timer = timer_read32();
 
@@ -1376,6 +1415,39 @@ void rgb_matrix_wls_indicator(void) {
     }
 }
 
+// 连接成功后在 HS_SUCCEED_TIME 内常亮当前通道灯；放在渲染路径中，背光关闭时也能显示
+static void hs_wls_connected_indicator(void) {
+    if (linker_ok || timer_elapsed32(hs_connect_ok_time) >= HS_SUCCEED_TIME) return;
+
+    if (wireless_get_current_devs() == DEVS_USB) {
+        if (USB_DRIVER.state != USB_ACTIVE) return;
+#ifdef HS_RGB_BLINK_INDEX_USB
+        rgb_matrix_set_color(HS_RGB_BLINK_INDEX_USB, HS_LBACK_COLOR_USB);
+#endif
+        return;
+    }
+
+    if (*md_getp_state() != MD_STATE_CONNECTED) return;
+
+    switch (wireless_get_current_devs()) {
+        case DEVS_2G4: rgb_matrix_set_color(HS_RGB_BLINK_INDEX_2G4, HS_LBACK_COLOR_2G4); break;
+        case DEVS_BT1: rgb_matrix_set_color(HS_RGB_BLINK_INDEX_BT1, HS_LBACK_COLOR_BT1); break;
+        case DEVS_BT2: rgb_matrix_set_color(HS_RGB_BLINK_INDEX_BT2, HS_LBACK_COLOR_BT2); break;
+        case DEVS_BT3: rgb_matrix_set_color(HS_RGB_BLINK_INDEX_BT3, HS_LBACK_COLOR_BT3); break;
+        default: break;
+    }
+}
+
+// 配对闪烁与连接成功提示都结束后，若背光是临时点亮的则恢复关闭
+void hs_wls_indicator_force_task(void) {
+    if (!hs_wls_force_rgb || hs_bat_force_rgb) return;
+    if (!linker_ok) return;
+    // 正常闪烁会在连接提示期内归零；若切换设备时残留计时，最多再等 HS_SUCCEED_TIME 强制结束，避免背光常亮
+    if (wls_rgb_indicator_timer != 0 && timer_elapsed32(hs_wls_force_timer) < HS_SUCCEED_TIME) return;
+    hs_wls_force_rgb = false;
+    hs_indicator_rgb_release();
+}
+
 #    endif
 
 #endif
@@ -1412,9 +1484,15 @@ bool rgb_matrix_indicators_advanced_kb(uint8_t led_min, uint8_t led_max) {
     }
 #endif
 
+    // 背光关闭、仅为显示状态灯而临时点亮时，清掉灯效与侧灯，只保留状态指示
+    if (hs_wls_force_rgb) {
+        rgb_matrix_set_color_all(0x00, 0x00, 0x00);
+    }
+
 #ifdef WIRELESS_ENABLE
     if (!linker_ok) {
         rgb_matrix_wls_indicator();
+        hs_wls_connected_indicator();
     }
 #endif
 
@@ -1458,52 +1536,37 @@ void lpwr_wakeup_hook(void) { // wireless wakeup
 }
 
 void hs_rgb_blink_hook_user(void) { 
-    static uint32_t connect_ok_time = 0;
 
     if (wireless_get_current_devs() == DEVS_USB) { 
         if (USB_DRIVER.state == USB_ACTIVE) {
-            if(linker_ok == false) {
-
-                if (timer_elapsed32(connect_ok_time) < HS_SUCCEED_TIME) {
-#ifdef HS_RGB_BLINK_INDEX_USB
-                    rgb_matrix_set_color(HS_RGB_BLINK_INDEX_USB,HS_LBACK_COLOR_USB);
-#endif
-                } else {
-                    linker_ok = true;
-                    connect_ok_time = timer_read32();
-                }
+            if (linker_ok == false && timer_elapsed32(hs_connect_ok_time) >= HS_SUCCEED_TIME) {
+                linker_ok          = true;
+                hs_connect_ok_time = timer_read32();
             }
         } else {
-            linker_ok              = false;
-            connect_ok_time = timer_read32();
+            linker_ok          = false;
+            hs_connect_ok_time = timer_read32();
         }
-    } else {
-        switch (*md_getp_state()) {
-            case MD_STATE_DISCONNECTED: {
-                linker_ok                = false;
-                connect_ok_time = timer_read32();
-            } break;
-            case MD_STATE_PAIRING: {
-                linker_ok                = false;
-                connect_ok_time = timer_read32();
-            } break;
-            case MD_STATE_CONNECTED: {
-                if(linker_ok == false){
-                    if (timer_elapsed32(connect_ok_time) < HS_SUCCEED_TIME) {
-                        switch(wireless_get_current_devs()) {
-                            case DEVS_2G4: rgb_matrix_set_color(HS_RGB_BLINK_INDEX_2G4,HS_LBACK_COLOR_2G4); break;
-                            case DEVS_BT1: rgb_matrix_set_color(HS_RGB_BLINK_INDEX_BT1,HS_LBACK_COLOR_BT1); break;
-                            case DEVS_BT2: rgb_matrix_set_color(HS_RGB_BLINK_INDEX_BT2,HS_LBACK_COLOR_BT2); break;
-                            case DEVS_BT3: rgb_matrix_set_color(HS_RGB_BLINK_INDEX_BT3,HS_LBACK_COLOR_BT3); break;
-                        }
-                    } else {
-                        linker_ok = true;
-                        connect_ok_time = timer_read32();
-                    }
+        return;
+    }
+
+    switch (*md_getp_state()) {
+        case MD_STATE_DISCONNECTED:
+        case MD_STATE_PAIRING: {
+            linker_ok          = false;
+            hs_connect_ok_time = timer_read32();
+        } break;
+        case MD_STATE_CONNECTED: {
+            if (linker_ok == false) {
+                if (timer_elapsed32(hs_connect_ok_time) < HS_SUCCEED_TIME) {
+                    hs_wls_indicator_force_begin(); // 背光关闭时也要显示连接成功灯
+                } else {
+                    linker_ok          = true;
+                    hs_connect_ok_time = timer_read32();
                 }
-            } break;
-            default:
-                break;
-        }
+            }
+        } break;
+        default:
+            break;
     }
 }
