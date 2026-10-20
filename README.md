@@ -13,7 +13,7 @@ Royal Kludge **RK98PRO**（QMK 路径 `royalkludge/rk98pro_us_triple_mode`）的
 
 ## 下载固件
 
-最新正式版：**[v1.1.0](https://github.com/Hello-Dream/rk98pro-qmk/releases/latest)**（版本号以 Releases 页为准）
+最新正式版：**[v1.1.1](https://github.com/Hello-Dream/rk98pro-qmk/releases/latest)**（版本号以 Releases 页为准）
 
 | 文件 | 用途 |
 | --- | --- |
@@ -32,7 +32,7 @@ Royal Kludge **RK98PRO**（QMK 路径 `royalkludge/rk98pro_us_triple_mode`）的
 .
 ├── README.md
 ├── CHANGELOG.md                # 版本变更记录
-├── RELEASE_NOTES.md            # v1.1.0 发布说明（GitHub Release 正文）
+├── RELEASE_NOTES.md            # v1.1.1 发布说明（GitHub Release 正文）
 ├── LICENSE
 ├── .gitignore
 ├── .gitattributes
