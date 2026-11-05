@@ -1,0 +1,9 @@
+SRC += hs/wireless.c
+SRC += hs/store.c
+SRC += hs/battery.c
+SRC += hs/status.c
+SRC += hs/via.c
+SRC += hs/keys.c
+SRC += hs/rgb.c
+SRC += hs/indicators.c
+SRC += hs/power.c

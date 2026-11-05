@@ -1,0 +1,38 @@
+# 编译产物
+.build/
+*.bin
+*.hex
+*.elf
+*.uf2
+*.map
+*.lst
+*.o
+*.d
+*.a
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# 日志 / 临时
+*.log
+*.tmp
+
+# Python 缓存 / 构建产物
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+host/node_modules/
+host/src-tauri/target/
+host/src-tauri/gen/
+host/.tauri/
+host/build/
+host/dist/
+host/test-results/
+host/playwright-report/
+host/coverage/

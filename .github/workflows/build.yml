@@ -1,0 +1,380 @@
+name: Build firmware and desktop app
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    # 普通 push 只做校验与测试，不生成桌面安装包
+    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout this keyboard repo
+        uses: actions/checkout@v7
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libudev-dev \
+            libdbus-1-dev \
+            pkg-config \
+            libssl-dev \
+            patchelf
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 12
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: host/pnpm-lock.yaml
+
+      - name: Install desktop dependencies
+        working-directory: host
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint frontend
+        working-directory: host
+        run: pnpm lint
+
+      - name: Typecheck frontend
+        working-directory: host
+        run: pnpm typecheck
+
+      - name: Validate VIA definition
+        run: python3 scripts/validate_via_json.py
+
+      - name: Check host read-only API surface
+        run: |
+          if grep -nE "set_device_setting|write_block|keymap_write|rgb_write|wireless_switch|wireless_pair|wireless_clear|capture_key|import_config|show_battery" host/src/lib/api.ts; then
+            echo "::error::host/src/lib/api.ts contains keyboard write commands"
+            exit 1
+          fi
+
+      - name: Test frontend
+        working-directory: host
+        run: pnpm test
+
+      - name: Test Rust protocol/notification logic
+        run: |
+          set -o pipefail
+          RUST_BACKTRACE=1 cargo test --manifest-path host/src-tauri/Cargo.toml 2>&1 | tee rust-test.log
+
+      - name: Show Rust test log on failure
+        if: failure()
+        shell: bash
+        run: |
+          {
+            echo '### Rust test log (tail)'
+            echo '```'
+            tail -n 200 rust-test.log || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          grep -nE -A8 -B2 "error(\[|:)|panicked|FAILED|failures:|assertion|left:|right:" rust-test.log | tail -n 160 | while IFS= read -r line; do
+            echo "::error::$line"
+          done || true
+
+  desktop:
+    # 上位机安装包只在 tag 构建时生成
+    if: startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            arch: x64
+            build_script: build:windows:setup
+            build_args: ''
+            target_dir: host/src-tauri/target
+            rust_targets: ''
+          - os: windows-latest
+            arch: arm64
+            build_script: build:windows:setup
+            build_args: '--target aarch64-pc-windows-msvc'
+            target_dir: host/src-tauri/target/aarch64-pc-windows-msvc
+            rust_targets: aarch64-pc-windows-msvc
+          - os: ubuntu-22.04
+            arch: amd64
+            build_script: build:linux
+            build_args: ''
+            target_dir: host/src-tauri/target
+            rust_targets: ''
+          - os: ubuntu-22.04-arm
+            arch: arm64
+            build_script: build:linux
+            build_args: ''
+            target_dir: host/src-tauri/target
+            rust_targets: ''
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout this keyboard repo
+        uses: actions/checkout@v7
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libudev-dev \
+            libdbus-1-dev \
+            pkg-config \
+            libssl-dev \
+            patchelf
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 12
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: host/pnpm-lock.yaml
+
+      - name: Install desktop dependencies
+        working-directory: host
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint frontend
+        working-directory: host
+        run: pnpm lint
+
+      - name: Typecheck frontend
+        working-directory: host
+        run: pnpm typecheck
+
+      - name: Test frontend
+        working-directory: host
+        run: pnpm test
+
+      - name: Test Rust protocol/notification logic
+        run: cargo test --manifest-path host/src-tauri/Cargo.toml
+
+      - name: Build desktop app
+        working-directory: host
+        run: pnpm run ${{ matrix.build_script }} ${{ matrix.build_args }}
+
+      - name: Prepare Windows setup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Copy-Item "${{ matrix.target_dir }}/release/bundle/nsis/*.exe" "rk98pro-monitor-windows-${{ matrix.arch }}-setup.exe"
+
+      - name: Upload Windows setup
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v7
+        with:
+          name: rk98pro-monitor-windows-setup-${{ matrix.arch }}
+          path: rk98pro-monitor-windows-${{ matrix.arch }}-setup.exe
+          if-no-files-found: error
+
+      - name: Prepare Windows portable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Copy-Item "${{ matrix.target_dir }}/release/rk98pro-monitor.exe" "rk98pro-monitor-windows-${{ matrix.arch }}.exe"
+
+      - name: Upload Windows portable
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v7
+        with:
+          name: rk98pro-monitor-windows-portable-${{ matrix.arch }}
+          path: rk98pro-monitor-windows-${{ matrix.arch }}.exe
+          if-no-files-found: error
+
+      - name: Upload Linux AppImage
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v7
+        with:
+          name: rk98pro-monitor-linux-appimage-${{ matrix.arch }}
+          path: ${{ matrix.target_dir }}/release/bundle/appimage/*.AppImage
+          if-no-files-found: error
+
+      - name: Upload Linux deb
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v7
+        with:
+          name: rk98pro-monitor-linux-deb-${{ matrix.arch }}
+          path: ${{ matrix.target_dir }}/release/bundle/deb/*.deb
+          if-no-files-found: error
+
+      - name: Upload Linux rpm
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v7
+        with:
+          name: rk98pro-monitor-linux-rpm-${{ matrix.arch }}
+          path: ${{ matrix.target_dir }}/release/bundle/rpm/*.rpm
+          if-no-files-found: error
+
+  build:
+    # 固定 LTS 宿主，避免 ubuntu-latest 标签迁移导致构建环境漂移
+    runs-on: ubuntu-24.04
+    container: ghcr.io/qmk/qmk_cli
+
+    steps:
+      - name: Disable git safe.directory check
+        run: git config --global --add safe.directory '*'
+
+      - name: Checkout QMK firmware (pinned upstream)
+        uses: actions/checkout@v7
+        with:
+          # 固定上游 master 提交（2026-10-29）：已包含 NVM 重构，
+          # 键盘代码按新的 EEPROM / GPIO / eeconfig / raw HID 接口适配。
+          repository: qmk/qmk_firmware
+          ref: f5db962110615fd263c3ebf9f0402e7c2b08fbe4
+          submodules: recursive
+
+      - name: Checkout this keyboard repo
+        uses: actions/checkout@v7
+        with:
+          path: _keyboard
+          # 需要完整历史：push 到 main 时用 github.event.before 作为兼容性检查基线
+          fetch-depth: 0
+
+      - name: Resolve change base
+        run: |
+          set -euo pipefail
+          # push 事件必须以上一个提交为基线；直接推 main 时 origin/main 已经指向 HEAD
+          base="${{ github.event.before }}"
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            base="origin/main"
+          fi
+          if ! git -C _keyboard cat-file -e "${base}^{commit}" 2>/dev/null; then
+            if [ "$base" = "origin/main" ]; then
+              git -C _keyboard fetch --no-tags origin main:refs/remotes/origin/main
+            else
+              git -C _keyboard fetch --no-tags origin "$base"
+            fi
+          fi
+          git -C _keyboard cat-file -e "${base}^{commit}"
+          echo "CHECK_BASE=$base" >> "$GITHUB_ENV"
+
+      - name: Check compatibility constraints
+        run: |
+          python3 _keyboard/scripts/check_constraints.py --base "$CHECK_BASE" --strict
+
+      - name: Validate VIA definition
+        run: |
+          python3 _keyboard/scripts/validate_via_json.py
+
+      - name: Check changed C/H files
+        # 容器默认使用 dash，mapfile / 进程替换需要显式切换到 bash
+        shell: bash
+        run: |
+          mapfile -t files < <(git -C _keyboard diff --name-only --diff-filter=ACMR "$CHECK_BASE"...HEAD -- '*.c' '*.h')
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No changed C/H files to check."
+            exit 0
+          fi
+          git -C _keyboard diff --check "$CHECK_BASE"...HEAD -- '*.c' '*.h'
+
+      - name: Overlay keyboard into QMK tree
+        run: |
+          cp -r _keyboard/keyboards/. keyboards/
+          find keyboards/linker keyboards/royalkludge -maxdepth 3 | sort
+
+      - name: Build firmware
+        run: |
+          set -o pipefail
+          make royalkludge/rk98pro_us_triple_mode:default 2>&1 | tee build.log
+
+      - name: Show build log on failure
+        if: failure()
+        run: |
+          echo "### Build log (tail)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          tail -n 200 build.log >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report build error
+        if: failure()
+        run: |
+          if [ -f build.log ]; then
+            grep -iE "error|fatal|not found|unknown" build.log | tail -n 12 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+          fi
+
+      - name: Upload firmware artifact
+        # 普通 push 只编译校验；固件产物仅在 tag 发布时上传
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v7
+        with:
+          name: rk98pro-firmware
+          path: |
+            *.bin
+            *.hex
+            *.uf2
+          if-no-files-found: error
+
+  release:
+    # 等固件和四个桌面平台全部构建成功后再发布，保证 Release 附件完整
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, desktop]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout this keyboard repo
+        uses: actions/checkout@v7
+
+      - name: Download firmware artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: rk98pro-firmware
+          path: release-assets/firmware
+
+      - name: Download desktop artifacts
+        uses: actions/download-artifact@v7
+        with:
+          pattern: rk98pro-monitor-*
+          path: release-assets/desktop
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          name: RK98PRO 三模 QMK 固件与上位机 ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          files: |
+            release-assets/firmware/*.bin
+            keyboards/royalkludge/rk98pro_us_triple_mode/rk98pro_us_triple_mode.json
+            release-assets/desktop/rk98pro-monitor-windows-setup-*/*.exe
+            release-assets/desktop/rk98pro-monitor-windows-portable-*/*.exe
+            release-assets/desktop/rk98pro-monitor-linux-appimage-*/*.AppImage
+            release-assets/desktop/rk98pro-monitor-linux-deb-*/*.deb
+            release-assets/desktop/rk98pro-monitor-linux-rpm-*/*.rpm
+          fail_on_unmatched_files: true

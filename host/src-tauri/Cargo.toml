@@ -1,0 +1,23 @@
+[package]
+name = "rk98pro-monitor"
+version = "1.0.0"
+description = "RK98PRO read-only battery, status and notification monitor"
+authors = ["RK98PRO QMK contributors"]
+edition = "2021"
+license = "GPL-2.0-or-later"
+
+[lib]
+name = "rk98pro_monitor_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "wry"] }
+tauri-plugin-notification = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+hidapi = { version = "2", features = ["windows-native"] }
+log = "0.4"
+env_logger = "0.11"
