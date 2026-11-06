@@ -140,7 +140,8 @@
 #define HS_SETTINGS_VERSION        1
 
 /* 固件与只读状态快照版本：不参与 EEPROM 布局计算。
- * 发版时与 keyboard.json 的 version、CHANGELOG 保持同步。 */
+ * HS_FIRMWARE_VERSION_* 是固件内部协议版本，与产品发布版本（keyboard.json）相互独立；
+ * 状态快照布局变化时递增 HS_STATUS_SNAPSHOT_VERSION。 */
 #define HS_HOST_PROTOCOL_VERSION   4
 #define HS_FIRMWARE_VERSION_MAJOR  3
 #define HS_FIRMWARE_VERSION_MINOR  0

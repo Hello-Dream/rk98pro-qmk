@@ -5,7 +5,7 @@
 > [!NOTE]
 > 自定义 EEPROM 设置（`hs_settings`、按键 RGB 录制、侧灯 HSV 槽位）带有版本号与 CRC。首次刷入或检测到版本/CRC 不符时，固件会恢复默认设置，并同步刷新 VIA 缓存，正常无需手动清空 EEPROM；降级或数据异常时仍可按 [README.md](README.md#upgrade-eeprom) 手动清空。
 
-## [Unreleased]
+## [1.0.1] - 2026-11-06
 
 ### 修复
 

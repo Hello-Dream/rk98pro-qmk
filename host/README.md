@@ -1,4 +1,4 @@
-# RK98PRO Monitor v1.0.0
+# RK98PRO Monitor v1.0.1
 
 RK98PRO 的只读桌面监控。上位机只显示电量、键盘功能状态和本机通知，不写键盘；键位、灯效、侧灯、电源和 RGB 录制仍由 VIA 配置。
 

@@ -2,7 +2,7 @@
 
 Royal Kludge **RK98PRO**（QMK 路径 `royalkludge/rk98pro_us_triple_mode`）的 QMK 固件、VIA 定义与只读桌面监控。
 
-本仓库以 overlay 形式提供键盘固件：需要叠加到官方 `qmk/qmk_firmware` 的固定提交后编译，不包含完整 QMK 源码树。当前版本 **v1.0.0**，是仓库的首个版本，固件、VIA 定义与上位机版本号一致。
+本仓库以 overlay 形式提供键盘固件：需要叠加到官方 `qmk/qmk_firmware` 的固定提交后编译，不包含完整 QMK 源码树。当前版本 **v1.0.1**，是 v1.0.0 的缺陷修复版本，固件、VIA 定义与上位机版本号一致。
 
 ## 特性
 
@@ -24,7 +24,7 @@ Royal Kludge **RK98PRO**（QMK 路径 `royalkludge/rk98pro_us_triple_mode`）的
 
 ## 下载
 
-最新版本：**[v1.0.0](https://github.com/Hello-Dream/rk98pro-qmk/releases/latest)**
+最新版本：**[v1.0.1](https://github.com/Hello-Dream/rk98pro-qmk/releases/latest)**
 
 | 文件 | 用途 |
 | --- | --- |
@@ -175,7 +175,7 @@ VIA 中还提供：
 
 2.4G 模式下，键盘把 raw HID 报告经无线模块转发给接收器，上位机直接和接收器的 `usage_page=0xFF60` / `usage=0x61` 接口通信。USB 有线模式下则由键盘自身暴露同一接口。蓝牙模式只提供标准 HID 键盘报告，没有 VIA raw HID 通道，因此上位机无法通过蓝牙读取状态；需要改用 USB 线或 2.4G 接收器。
 
-v1.0.0 固件与上位机使用只读状态通道 `0x22` 和 raw HID 事件推送，上位机只发送 GET，不写键盘。`HS_SETTINGS_VERSION` 为 1，首次刷入会初始化自定义设置、RGB 录制和动态键位；VIA 自定义 ID `0x10`–`0x21` 与 `rk98pro_us_triple_mode.json` 配合使用。协议说明见 [host/README.md](host/README.md)。
+v1.0.1 固件与上位机使用只读状态通道 `0x22` 和 raw HID 事件推送，上位机只发送 GET，不写键盘。`HS_SETTINGS_VERSION` 为 1，首次刷入会初始化自定义设置、RGB 录制和动态键位；VIA 自定义 ID `0x10`–`0x21` 与 `rk98pro_us_triple_mode.json` 配合使用。协议说明见 [host/README.md](host/README.md)。
 
 ## 自定义灯效
 
