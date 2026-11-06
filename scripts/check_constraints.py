@@ -32,6 +32,9 @@ WLS_H = KEYBOARD_DIR / "hs/wireless_glue.h"
 OLD_WLS_H = KEYBOARD_DIR / "wls/wls.h"
 STORE_H = KEYBOARD_DIR / "hs/store.h"
 OLD_STORE_H = KEYBOARD_DIR / "wls/hs_store.h"
+HOST_PACKAGE_JSON = REPO_ROOT / "host/package.json"
+HOST_CARGO_TOML = REPO_ROOT / "host/src-tauri/Cargo.toml"
+HOST_TAURI_CONF = REPO_ROOT / "host/src-tauri/tauri.conf.json"
 
 ZERO_SHA_RE = re.compile(r"^0+$")
 INT_SUFFIX_RE = re.compile(r"(?<=\d)(?:ULL|UL|LL|U|L)\b")
@@ -639,6 +642,73 @@ def check_debounce(report: Report, keyboard: dict[str, Any]) -> None:
         report.error(f"debounce 必须保持 10ms，当前为 {debounce!r}。")
 
 
+def cargo_package_version(text: Optional[str]) -> Optional[str]:
+    """读取 Cargo.toml 中 [package] 段的 version。"""
+    if text is None:
+        return None
+    package = re.search(r"(?ms)^\[package\]\s*$(.*?)(?=^\[|\Z)", text)
+    if package is None:
+        return None
+    version = re.search(r'(?m)^version\s*=\s*"([^"]+)"', package.group(1))
+    return version.group(1) if version else None
+
+
+def check_release_versions(report: Report, keyboard: dict[str, Any]) -> None:
+    """固件和上位机的产品版本必须与 keyboard.json 一致。"""
+    release = str(keyboard.get("version", ""))
+    if not release:
+        report.error("keyboard.json 缺少 version。")
+        return
+
+    config = read_text(None, CONFIG_H)
+    if config is None:
+        report.error("无法读取 config.h，不能检查固件版本。")
+        return
+
+    defines = parse_defines(config)
+    values: list[int] = []
+    for part in ("MAJOR", "MINOR", "PATCH"):
+        name = f"HS_FIRMWARE_VERSION_{part}"
+        raw = defines.get(name)
+        if raw is None:
+            report.error(f"config.h 缺少 {name}。")
+            return
+        try:
+            values.append(eval_int(raw, defines, (0, 0)))
+        except (ValueError, SyntaxError):
+            report.error(f"{name} 不是整数：{raw!r}。")
+            return
+
+    sources: list[tuple[str, str]] = [
+        ("config.h HS_FIRMWARE_VERSION_*", ".".join(str(value) for value in values))
+    ]
+
+    host_package = read_json(None, HOST_PACKAGE_JSON)
+    if host_package is None:
+        report.error("无法读取 host/package.json。")
+    else:
+        sources.append(("host/package.json", str(host_package.get("version", ""))))
+
+    cargo_version = cargo_package_version(read_text(None, HOST_CARGO_TOML))
+    if cargo_version is None:
+        report.error("无法读取 host/src-tauri/Cargo.toml 的 [package] version。")
+    else:
+        sources.append(("host/src-tauri/Cargo.toml", cargo_version))
+
+    tauri = read_json(None, HOST_TAURI_CONF)
+    if tauri is None:
+        report.error("无法读取 host/src-tauri/tauri.conf.json。")
+    elif "version" in tauri:
+        sources.append(("host/src-tauri/tauri.conf.json", str(tauri.get("version", ""))))
+
+    for source, version in sources:
+        if version != release:
+            report.error(
+                f"{source} 的产品版本 {version!r} 与 keyboard.json 的 version {release!r} 不一致；"
+                "发版时必须同步。"
+            )
+
+
 def check_via_definition(report: Report) -> None:
     """调用 VIA 定义校验脚本。"""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -700,6 +770,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     check_keycodes(report, base_commit, base_keyboard, keyboard, via)
     check_rgb_effects(report, base_commit, base_keyboard, base_via, keyboard, via)
     check_debounce(report, keyboard)
+    check_release_versions(report, keyboard)
     check_via_definition(report)
 
     for note in report.notes:

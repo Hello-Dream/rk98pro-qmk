@@ -35,7 +35,7 @@ export default function AppShell() {
           </div>
           <div>
             <strong className="block text-sm">RK98PRO</strong>
-            <span className="text-xs text-slate-500">Monitor 2.0</span>
+            <span className="text-xs text-slate-500">Monitor</span>
           </div>
         </div>
         <nav className="flex flex-1 flex-col gap-1" aria-label="主导航">

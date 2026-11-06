@@ -20,9 +20,9 @@ import {
 function status(overrides: Partial<Status> = {}): Status {
   return {
     seq: 1,
-    version: 3,
-    firmwareVersion: '3.0.0',
-    settingsVersion: 5,
+    version: 1,
+    firmwareVersion: '1.0.1',
+    settingsVersion: 1,
     battery: 80,
     charging: CHARGING_DISCHARGING,
     link: 2,

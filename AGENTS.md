@@ -67,7 +67,8 @@ make royalkludge/rk98pro_us_triple_mode:default:flash
 
 ## 版本与发布
 
-- 发版时同步 `keyboard.json` 的 `version`、`CHANGELOG.md`、`README.md` 和 `RELEASE_NOTES.md`，不要只改代码。
+- 发版时同步产品版本：`keyboard.json` 的 `version`、`config.h` 的 `HS_FIRMWARE_VERSION_*`、`host/package.json`、`host/src-tauri/Cargo.toml`，以及 `CHANGELOG.md`、`README.md` 和 `RELEASE_NOTES.md`；`scripts/check_constraints.py` 会校验这些版本一致。
+- `HS_SETTINGS_VERSION` 和 `HS_STATUS_SNAPSHOT_VERSION` 是兼容性版本，不随产品版本递增；前者只在 EEPROM 布局变化时递增，后者只在状态快照字段或事件格式变化时递增。
 - 发布产物是 `royalkludge_rk98pro_us_triple_mode_default.bin` 和 `rk98pro_us_triple_mode.json`，以及 Windows / Linux 的 x64、ARM64 上位机安装包；推送 `v*` tag 会触发 Release，正文取自 `RELEASE_NOTES.md`。普通 push 只跑校验、测试和固件编译，不生成桌面安装包。
 - `*.bin`、`*.hex`、`*.uf2`、`*.elf` 已被 `.gitignore` 忽略；根目录同名产物是本地文件，不要提交。
 - 用户可见的快捷键或行为变化需同步 `README.md` 与 `快捷键说明.md`；文档和代码注释保持中文。

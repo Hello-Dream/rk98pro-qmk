@@ -13,9 +13,9 @@ const mocks = vi.hoisted(() => ({
   },
   status: {
     seq: 1,
-    version: 3,
-    firmwareVersion: '3.0.0',
-    settingsVersion: 5,
+    version: 1,
+    firmwareVersion: '1.0.1',
+    settingsVersion: 1,
     battery: 79,
     charging: 0,
     link: 2,

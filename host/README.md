@@ -78,12 +78,12 @@ cargo test --manifest-path src-tauri/Cargo.toml
 GET 响应的 `value_data[3..]` 和事件 payload 使用同一份 23 字节快照：
 
 ```text
-[0]  version             快照布局版本
+[0]  version             快照协议版本，当前 1（上位机只接受 1）
 [1]  seq                 状态变化序号
-[2]  fw_major
-[3]  fw_minor
-[4]  fw_patch
-[5]  settings_version    HS_SETTINGS_VERSION
+[2]  fw_major            固件发布版本主版本（与 keyboard.json version 一致，当前 1.0.1）
+[3]  fw_minor            固件发布版本次版本
+[4]  fw_patch            固件发布版本修订号
+[5]  settings_version    HS_SETTINGS_VERSION（EEPROM 设置布局版本，当前 1）
 [6]  battery             0~100，0xFF 未知
 [7]  charging            0=放电 1=充电 2=充满 0xFF 未知
 [8]  link                0=none 1=pairing 2=connected 3=disconnected 4=reject
@@ -102,6 +102,8 @@ GET 响应的 `value_data[3..]` 和事件 payload 使用同一份 23 字节快�
 [21] wireless_version
 [22] reserved
 ```
+
+`fw_*` 仅用于显示固件发布版本，不用于协议兼容判断；协议兼容性看 `version`（快照协议版本）。`settings_version` 是 EEPROM 设置布局版本，与发布版本无关。上位机只接受快照版本 `1`；快照版本 `3` 的旧固件会被拒绝并提示更新固件。
 
 ### 事件
 

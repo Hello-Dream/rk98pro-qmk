@@ -464,9 +464,9 @@ mod tests {
     fn status(battery: u8, charging: u8, link: u8) -> Status {
         Status {
             seq: 1,
-            version: 3,
-            firmware_version: "3.0.0".to_string(),
-            settings_version: 5,
+            version: 1,
+            firmware_version: "1.0.1".to_string(),
+            settings_version: 1,
             battery: Some(battery),
             charging,
             link,

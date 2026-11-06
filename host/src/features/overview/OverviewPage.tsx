@@ -103,8 +103,11 @@ export default function OverviewPage() {
                 <BatteryCharging className="h-4 w-4" />
                 查看电量历史
               </Link>
-              <span className="text-xs text-slate-500">
-                固件 {status?.firmwareVersion ?? '--'} · 设置版本 {status?.settingsVersion ?? '--'}
+              <span
+                className="text-xs text-slate-500"
+                title={`设置 ${status?.settingsVersion ?? '--'} · 快照 ${status?.version ?? '--'} · 无线模块 ${status?.wirelessVersion ?? '--'}`}
+              >
+                固件 {status?.firmwareVersion ?? '--'}
               </span>
             </div>
             <p className="mt-3 text-xs text-slate-500">

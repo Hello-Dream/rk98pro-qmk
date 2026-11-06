@@ -17,9 +17,9 @@ const mocks = vi.hoisted(() => {
   };
   const statusData = {
     seq: 1,
-    version: 3,
-    firmwareVersion: '3.0.0',
-    settingsVersion: 5,
+    version: 1,
+    firmwareVersion: '1.0.1',
+    settingsVersion: 1,
     battery: 82,
     charging: 0,
     link: 2,
@@ -54,9 +54,9 @@ describe('键盘状态仪表盘', () => {
   beforeEach(() => {
     mocks.statusData = {
       seq: 1,
-      version: 3,
-      firmwareVersion: '3.0.0',
-      settingsVersion: 5,
+      version: 1,
+      firmwareVersion: '1.0.1',
+      settingsVersion: 1,
       battery: 82,
       charging: 0,
       link: 2,
@@ -91,6 +91,9 @@ describe('键盘状态仪表盘', () => {
     expect(screen.getByText('Caps')).toBeInTheDocument();
     expect(screen.getByText('WPM 统计卡片')).toBeInTheDocument();
     expect(screen.getByText('RK98PRO 电量低')).toBeInTheDocument();
+    expect(screen.getByText('固件 1.0.1')).toBeInTheDocument();
+    expect(screen.getByTitle('设置 1 · 快照 1 · 无线模块 1')).toBeInTheDocument();
+    expect(screen.queryByText(/设置版本/)).not.toBeInTheDocument();
   });
 
   it('离线时显示连接提示', () => {

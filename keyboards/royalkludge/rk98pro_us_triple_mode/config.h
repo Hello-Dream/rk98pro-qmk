@@ -139,14 +139,15 @@
  * 版本号与数据区大小一起写入 EECONFIG_USER，版本不符时首次启动自动恢复默认。 */
 #define HS_SETTINGS_VERSION        1
 
-/* 固件与只读状态快照版本：不参与 EEPROM 布局计算。
- * HS_FIRMWARE_VERSION_* 是固件内部协议版本，与产品发布版本（keyboard.json）相互独立；
- * 状态快照布局变化时递增 HS_STATUS_SNAPSHOT_VERSION。 */
-#define HS_HOST_PROTOCOL_VERSION   4
-#define HS_FIRMWARE_VERSION_MAJOR  3
+/* 版本号分三个独立轴，互不跟随：
+ * - 产品发布版本：HS_FIRMWARE_VERSION_*，必须与 keyboard.json 的 version 一致；
+ * - EEPROM 设置版本：HS_SETTINGS_VERSION，见上，只在存储布局变化时递增；
+ * - 状态快照版本：HS_STATUS_SNAPSHOT_VERSION，只在快照字段或事件格式变化时递增。
+ * 快照版本本次从 3 重置为 1；23 字节布局未变，后续变化从 2 开始。 */
+#define HS_FIRMWARE_VERSION_MAJOR  1
 #define HS_FIRMWARE_VERSION_MINOR  0
-#define HS_FIRMWARE_VERSION_PATCH  0
-#define HS_STATUS_SNAPSHOT_VERSION 3
+#define HS_FIRMWARE_VERSION_PATCH  1
+#define HS_STATUS_SNAPSHOT_VERSION 1
 
 #define EECONFIG_USER_DATA_VERSION (0x52000000UL | ((uint32_t)HS_SETTINGS_VERSION << 16) | ((uint32_t)EECONFIG_USER_DATA_SIZE & 0xFFFF))
 

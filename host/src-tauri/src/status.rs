@@ -14,6 +14,7 @@ pub const LINK_CONNECTED: u8 = 2;
 pub const MODE_USB: u8 = 0;
 pub const MODE_2G4: u8 = 6;
 pub const FULL_BATTERY_MIN: u8 = 98;
+pub const SNAPSHOT_VERSION: u8 = 1;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -51,6 +52,12 @@ impl Status {
         }
         if value[0] == 0 {
             return Err(ViaError::Protocol("状态快照版本无效".into()));
+        }
+        if value[0] != SNAPSHOT_VERSION {
+            return Err(ViaError::Protocol(format!(
+                "状态快照版本 {} 不受支持，请更新固件",
+                value[0]
+            )));
         }
 
         let battery = if value[6] <= 100 { Some(value[6]) } else { None };
@@ -145,12 +152,12 @@ mod tests {
 
     fn snapshot(battery: u8, charging: u8) -> Vec<u8> {
         let mut value = vec![0u8; 23];
-        value[0] = 3;
+        value[0] = SNAPSHOT_VERSION;
         value[1] = 7;
-        value[2] = 3;
+        value[2] = 1;
         value[3] = 0;
-        value[4] = 0;
-        value[5] = 5;
+        value[4] = 1;
+        value[5] = 1;
         value[6] = battery;
         value[7] = charging;
         value[8] = 2;
@@ -174,8 +181,9 @@ mod tests {
     fn parses_snapshot() {
         let status = Status::parse(&snapshot(82, CHARGING_DISCHARGING)).unwrap();
         assert_eq!(status.seq, 7);
-        assert_eq!(status.firmware_version, "3.0.0");
-        assert_eq!(status.settings_version, 5);
+        assert_eq!(status.version, SNAPSHOT_VERSION);
+        assert_eq!(status.firmware_version, "1.0.1");
+        assert_eq!(status.settings_version, 1);
         assert_eq!(status.battery, Some(82));
         assert_eq!(status.mode, MODE_2G4);
         assert_eq!(status.layer, 2);
@@ -203,5 +211,21 @@ mod tests {
     #[test]
     fn rejects_short_snapshot() {
         assert!(Status::parse(&[0u8; 22]).is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_snapshot_version() {
+        let mut value = snapshot(82, CHARGING_DISCHARGING);
+        value[0] = 0;
+        let error = Status::parse(&value).unwrap_err().to_string();
+        assert!(error.contains("状态快照版本无效"));
+    }
+
+    #[test]
+    fn rejects_unsupported_snapshot_version() {
+        let mut value = snapshot(82, CHARGING_DISCHARGING);
+        value[0] = 3;
+        let error = Status::parse(&value).unwrap_err().to_string();
+        assert!(error.contains("状态快照版本 3 不受支持，请更新固件"));
     }
 }

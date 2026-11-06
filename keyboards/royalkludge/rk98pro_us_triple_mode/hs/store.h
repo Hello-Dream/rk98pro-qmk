@@ -7,11 +7,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/* 3.0 存储布局：显式字段 + magic + 版本 + CRC。
+/* 当前存储布局：显式字段 + magic + 版本 + CRC。
  * 字段新增只能追加，布局变化必须递增 HS_SETTINGS_VERSION。 */
 
 #define HS_STORE_MAGIC       0x4B52u /* 'R' 'K' */
-#define HS_STORE_LAYOUT      HS_SETTINGS_VERSION
 
 #define HS_SETTINGS_FIELDS_SIZE 24
 #define HS_POWER_FIELDS_SIZE    6

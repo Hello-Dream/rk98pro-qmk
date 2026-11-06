@@ -2,7 +2,7 @@
 
 Royal Kludge **RK98PRO**（QMK 路径 `royalkludge/rk98pro_us_triple_mode`）的 QMK 固件、VIA 定义与只读桌面监控。
 
-本仓库以 overlay 形式提供键盘固件：需要叠加到官方 `qmk/qmk_firmware` 的固定提交后编译，不包含完整 QMK 源码树。当前版本 **v1.0.1**，是 v1.0.0 的缺陷修复版本，固件、VIA 定义与上位机版本号一致。
+本仓库以 overlay 形式提供键盘固件：需要叠加到官方 `qmk/qmk_firmware` 的固定提交后编译，不包含完整 QMK 源码树。当前版本 **v1.0.1**，是 v1.0.0 的缺陷修复版本，并收敛了版本号模型；固件、VIA 定义与上位机版本号一致。
 
 ## 特性
 
@@ -21,6 +21,18 @@ Royal Kludge **RK98PRO**（QMK 路径 `royalkludge/rk98pro_us_triple_mode`）的
 - 电量降到 3% 时数字排显示电量条，侧灯红色闪烁约 20 秒后进入保护深睡；深睡后按键和模式开关无效，插入充电线 / USB 才能唤醒
 - 电量链路消抖与平滑：充电线 500ms、满电引脚 2s、原始电量 5 点中值 + EMA(1/4)；充满判定要求稳定满电信号且平滑电量不低于 98%
 - 未知电量保持未知，不显示为 100%
+
+## 版本号说明
+
+| 名称 | 当前值 | 递增条件 | 维护位置 |
+| --- | --- | --- | --- |
+| 产品发布版本 | `1.0.1` | 每次发布 | `keyboard.json`、`HS_FIRMWARE_VERSION_*`、上位机 `package.json` / `Cargo.toml`、git tag |
+| EEPROM 设置版本 | `1` | 设置块、RGB 录制或侧灯 HSV 布局变化 | `HS_SETTINGS_VERSION` |
+| 状态快照版本 | `1` | 状态快照字段或事件格式变化 | `HS_STATUS_SNAPSHOT_VERSION` |
+
+状态快照版本本次从 `3` 重置为 `1`：23 字节快照布局没有变化，后续布局或事件格式变化时从 `2` 开始递增。上位机只接受当前快照版本 `1`，升级上位机时需同步刷入本次固件。
+
+`usb.device_version 0.0.1` 是 USB 描述符版本，无线模块版本来自外部无线模块；两者都不是产品发布版本，不随产品版本递增。`EECONFIG_USER_DATA_VERSION` 由设置版本和数据区大小派生，不需要单独维护。
 
 ## 下载
 
@@ -130,7 +142,7 @@ make royalkludge/rk98pro_us_triple_mode:default:flash
 
 <a id="upgrade-eeprom"></a>
 
-本固件会为自定义持久化设置（`hs_settings`、按键 RGB 录制数据与侧灯 HSV 槽位）写入版本号和有效性标记。设置版本为 1（`HS_SETTINGS_VERSION = 1`）。首次启动或检测到版本 / CRC 不符时，固件会自动：
+本固件会为自定义持久化设置（`hs_settings`、按键 RGB 录制数据与侧灯 HSV 槽位）写入版本号和有效性标记。设置版本为 1（`HS_SETTINGS_VERSION = 1`）。上位机显示的固件版本来自 `config.h` 的 `HS_FIRMWARE_VERSION_*`，发版时与 `keyboard.json` 的 `version` 保持一致。首次启动或检测到版本 / CRC 不符时，固件会自动：
 
 - 恢复 QMK 灯效模式 / 亮度、睡眠超时、侧灯模式、背光开关、录制通道等默认设置；
 - 恢复按键 RGB 录制的默认数据；
@@ -175,7 +187,7 @@ VIA 中还提供：
 
 2.4G 模式下，键盘把 raw HID 报告经无线模块转发给接收器，上位机直接和接收器的 `usage_page=0xFF60` / `usage=0x61` 接口通信。USB 有线模式下则由键盘自身暴露同一接口。蓝牙模式只提供标准 HID 键盘报告，没有 VIA raw HID 通道，因此上位机无法通过蓝牙读取状态；需要改用 USB 线或 2.4G 接收器。
 
-v1.0.1 固件与上位机使用只读状态通道 `0x22` 和 raw HID 事件推送，上位机只发送 GET，不写键盘。`HS_SETTINGS_VERSION` 为 1，首次刷入会初始化自定义设置、RGB 录制和动态键位；VIA 自定义 ID `0x10`–`0x21` 与 `rk98pro_us_triple_mode.json` 配合使用。协议说明见 [host/README.md](host/README.md)。
+v1.0.1 固件与上位机使用只读状态通道 `0x22` 和 raw HID 事件推送，上位机只发送 GET，不写键盘。`HS_FIRMWARE_VERSION_*` 与 `keyboard.json` 的 `version` 同步，上位机显示发布版本；`HS_SETTINGS_VERSION` 是 EEPROM 布局版本，与发布版本无关。首次刷入会初始化自定义设置、RGB 录制和动态键位；VIA 自定义 ID `0x10`–`0x21` 与 `rk98pro_us_triple_mode.json` 配合使用。协议说明见 [host/README.md](host/README.md)。
 
 ## 自定义灯效
 
