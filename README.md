@@ -136,6 +136,8 @@ make royalkludge/rk98pro_us_triple_mode:default:flash
 - 恢复按键 RGB 录制的默认数据；
 - 让 VIA 的键位缓存失效并恢复默认键位。
 
+普通关机重开不会触发复位：只有在首次刷入、设置版本 / 数据区大小变化、CRC 校验失败或手动清空时，固件才会恢复默认。升级到本修复版本后首次启动会复位一次，之后设置会稳定保留。
+
 从厂商原版固件首次刷入本固件时**不需要手动清空 EEPROM**。只有降级或 EEPROM 数据异常时，才建议手动清空（任选其一）：
 
 1. **Bootmagic（最稳）**：按住 `Esc` 键再插 USB 线（会一并清除持久设置）。
@@ -150,7 +152,7 @@ make royalkludge/rk98pro_us_triple_mode:default:flash
 
 VIA 中还提供：
 
-- `Lighting → Side Light`：切换 6 颗侧灯的模式或关闭侧灯。
+- `Lighting → Side Light`：保存 6 颗侧灯的模式值或选择 `Off`；当前构建未启用独立侧灯驱动，该选项只保存模式，不会驱动灯光，也不会改变主键背光。
 - `Lighting → Key RGB Record`：选择录制通道（1~4）、开始/结束录制、清空当前通道、复制到下一通道。
 - `System → General`：睡眠超时、防连击、电量/连接状态和“在键盘上显示电量”。
 - `System → General → Anti-Bounce Filter`：开 / 关短按键过滤（等同 `Fn + Z`）。

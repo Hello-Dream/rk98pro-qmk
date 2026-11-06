@@ -22,6 +22,9 @@ static void hs_rl_apply_mode_internal(uint8_t mode, bool persist) {
 
     hs_rl_mode = mode;
 
+    /* RGBLIGHT_ENABLE 未启用时，rgblight_* 会被 rgb_matrix.h 映射到主键矩阵；
+     * 这里必须隔离，否则恢复侧灯会覆盖用户保存的主键灯效。 */
+#ifdef RGBLIGHT_ENABLE
     // 全程用 noeeprom 版本，最后只持久化一次，避免一次切换产生多次 EEPROM 写
     if (mode == 10) {
         HSV current = rgblight_get_hsv();
@@ -48,6 +51,9 @@ static void hs_rl_apply_mode_internal(uint8_t mode, bool persist) {
     if (persist) {
         eeconfig_update_rgblight_current();
     }
+#else
+    (void)persist;
+#endif
 }
 
 static void hs_rl_apply_mode(uint8_t mode) {
@@ -58,7 +64,7 @@ static void hs_rl_apply_mode_noeeprom(uint8_t mode) {
     hs_rl_apply_mode_internal(mode, false);
 }
 
-// 启动时按设置块重放侧灯模式与背光总开关，避免 rgblight 自己的 EEPROM 与设置块不一致
+// 启动时按设置块重放侧灯模式与背光总开关；未启用 rgblight 时侧灯部分为空操作
 void hs_settings_apply_boot(void) {
     hs_rl_apply_mode_noeeprom(hs_rl_mode);
 
@@ -71,11 +77,13 @@ void hs_settings_apply_boot(void) {
 }
 
 void im_rgblight_increase(void) {
-    uint8_t mode = rgblight_get_mode();
-
     if (hs_rl_mode >= ARRAY_SIZE(buff)) {
         hs_rl_mode = 0;
     }
+
+#ifdef RGBLIGHT_ENABLE
+    // 从侧灯当前状态反推模式索引；未启用 rgblight 时读到的会是主键矩阵状态，必须隔离。
+    uint8_t mode = rgblight_get_mode();
 
     if (mode == 1) {
         HSV rgb = rgblight_get_hsv();
@@ -90,6 +98,8 @@ void im_rgblight_increase(void) {
             default :break;
         }
     }
+#endif
+
     hs_rl_mode++;
 
     if (hs_rl_mode >= ARRAY_SIZE(buff)) hs_rl_mode = 0;

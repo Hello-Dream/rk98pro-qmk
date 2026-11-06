@@ -5,6 +5,7 @@
 #include "rgb_matrix.h"
 #include "eeprom.h"
 #include "eeconfig.h"
+#include "nvm_eeconfig.h"
 #include "hs/store.h"
 #include "hs/battery.h"
 /* 上游把 EECONFIG_USER_DATABLOCK / EECONFIG_USER 移入内部头文件；
@@ -318,7 +319,9 @@ bool rgbrec_register_record(uint16_t keycode, keyrecord_t *record) {
 bool hs_user_datablock_reset = false;
 
 void eeconfig_init_user_datablock(void) {
-    // 上游检测到用户数据区版本失效时调用；由 hs_store 统一写入新布局。
+    // 先写入 EECONFIG_USER 版本标记（并清零数据区）。否则 eeconfig_prepare_datablocks()
+    // 会在每次启动时都判定数据区无效，导致设置、键位和录制数据反复复位。
+    nvm_eeconfig_init_user_datablock();
     hs_store_reset();
     hs_user_datablock_reset = true;
 }
