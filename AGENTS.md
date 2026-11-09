@@ -11,12 +11,14 @@
 
 ## 验证与构建
 
-仓库没有单元测试，提交前按 CI 顺序执行：
+仓库没有固件单元测试；host 有 Vitest 前端测试和 Rust 单元测试。提交前按 CI 顺序执行：
 
 ```bash
 python3 scripts/check_constraints.py --base origin/main --strict
 python3 scripts/validate_via_json.py
 git diff --check origin/main...HEAD -- '*.c' '*.h'
+(cd host && pnpm lint && pnpm typecheck && pnpm test && pnpm build)
+cargo test --manifest-path host/src-tauri/Cargo.toml
 ```
 
 - `--base` 必须是本地已存在的提交；本地用 `origin/main`，CI 的 push 事件用 `github.event.before`（手动触发时回退 `origin/main`）。基线过旧会产生误报。
@@ -38,14 +40,14 @@ make royalkludge/rk98pro_us_triple_mode:default:flash
 
 ## 代码地图
 
-- `keyboard.json`：硬件与构建配置的单一事实来源，包括 6×19 矩阵、100 颗主键灯、6 层（`dynamic_keymap.layer_count`）、启用的内置灯效、USB VID/PID、10ms 去抖；6 颗侧灯由 `config.h` 的 `RGBLED_NUM` 定义。
+- `keyboard.json`：硬件与构建配置的单一事实来源，包括 6×19 矩阵、100 颗主键灯、6 层（`dynamic_keymap.layer_count`）、启用的内置灯效、USB VID/PID、10ms 去抖；6 颗侧灯由 `config.h` 的 `RGBLED_NUM` 定义。`features.rgblight=false` 时 `Side Light` 持久模式只保存模式值，充电、连接和低电状态提示仍通过 RGB Matrix 使用这些侧灯。
 - `keymaps/default/keymap.c`：6 层含义：`_BL`/`_FL` 为 Windows 基础/Fn，`_MBL`/`_MFL` 为 macOS 基础/Fn，`_DEFA` 为 Fn+右Shift 刷机层（左上角 `QK_BOOT`），`_MOUSE` 由 Fn+M 切换；增删层要同步 `keyboard.json` 的 `dynamic_keymap.layer_count`。
-- `rk98pro_us_triple_mode.c`：运行时主逻辑（电源/续航、指示灯、无线状态、VIA 自定义菜单、RGB 录制控制、EEPROM 复位）。主要钩子：`pre_process_record_kb`、`process_record_kb`、`housekeeping_task_user`、`rgb_matrix_indicators_advanced_kb`、`keyboard_post_init_kb`。
+- `rk98pro_us_triple_mode.c`：板级初始化、QMK 钩子和模块编排；电源/续航、指示灯、无线、VIA、RGB 录制和 EEPROM 复位主要由 `hs/` 模块实现。主要钩子：`pre_process_record_kb`、`process_record_kb`、`housekeeping_task_user`、`rgb_matrix_indicators_advanced_kb`、`keyboard_post_init_kb`。
 - `hs/status.c/h`：只读状态快照、`seq`、raw HID 事件推送和 VIA `0x22` GET。
 - `hs/power.c/h`、`hs/battery.c/h`：电源/续航状态机、电量滤波与充满判定。
-- `hs/indicators.c/h`：Caps/Num/Scroll/Win、侧灯状态、电量条和连接提示。
+- `hs/indicators.c/h`：Caps/Num/Scroll/Win、侧灯状态提示、电量条和连接提示。
 - `hs/keys.c/h`：短按键过滤、`process_record_user` 与按键初始化。
-- `hs/rgb.c/h`：侧灯模式、灯效选择与 RGB 录制集成。
+- `hs/rgb.c/h`：持久侧灯模式（当前只保存模式）、灯效选择与 RGB 录制集成；持久侧灯逻辑用 `#ifdef RGBLIGHT_ENABLE` 隔离，避免覆盖主键灯效。
 - `hs/wireless.c` + `hs/wireless_glue.h`：无线模式、配对、指示灯和休眠胶水。
 - `hs/via.c/h`、`hs/store.c/h`、`hs/layers.h`：VIA 分发、设置/录制存储和图层定义。
 - `rgb_record/`：按键 RGB 录制与 `RGBR_PLAY` 预览；共 4 个通道，默认快捷键只使用前 3 个，第 4 个为预留。

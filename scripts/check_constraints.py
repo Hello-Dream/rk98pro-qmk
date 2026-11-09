@@ -709,6 +709,36 @@ def check_release_versions(report: Report, keyboard: dict[str, Any]) -> None:
             )
 
 
+PACKAGING_FORBIDDEN_COPY = ("keyboard settings", "配置电源", "配置侧灯", "配置键位")
+
+
+def check_packaging_copy(report: Report) -> None:
+    """安装包描述必须保持只读定位，不能出现键盘/电源/侧灯配置表述。"""
+    tauri = read_json(None, HOST_TAURI_CONF)
+    if tauri is None:
+        report.error("无法读取 host/src-tauri/tauri.conf.json。")
+        return
+
+    bundle = tauri.get("bundle")
+    if not isinstance(bundle, dict):
+        report.error("host/src-tauri/tauri.conf.json 缺少 bundle 对象。")
+        return
+
+    for field in ("shortDescription", "longDescription"):
+        value = bundle.get(field)
+        if not isinstance(value, str) or not value.strip():
+            report.error(f"host/src-tauri/tauri.conf.json 的 bundle.{field} 必须是非空字符串。")
+            continue
+
+        lowered = value.casefold()
+        for forbidden in PACKAGING_FORBIDDEN_COPY:
+            if forbidden.casefold() in lowered:
+                report.error(
+                    f"host/src-tauri/tauri.conf.json 的 bundle.{field} 仍包含可配置表述 "
+                    f"{forbidden!r}；上位机必须保持只读。"
+                )
+
+
 def check_via_definition(report: Report) -> None:
     """调用 VIA 定义校验脚本。"""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -771,6 +801,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     check_rgb_effects(report, base_commit, base_keyboard, base_via, keyboard, via)
     check_debounce(report, keyboard)
     check_release_versions(report, keyboard)
+    check_packaging_copy(report)
     check_via_definition(report)
 
     for note in report.notes:

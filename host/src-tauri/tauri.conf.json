@@ -33,8 +33,8 @@
     "active": true,
     "targets": "all",
     "category": "Utility",
-    "shortDescription": "RK98PRO battery, connection and keyboard settings",
-    "longDescription": "通过 2.4G 接收器或有线连接读取 RK98PRO 的电量、充电状态和连接状态，并配置电源、侧灯与桌面通知。",
+    "shortDescription": "RK98PRO read-only battery, status, WPM and notification monitor",
+    "longDescription": "通过 USB 或 2.4G raw HID 只读 RK98PRO 的电量、充电、连接、键盘状态、WPM 与 RGB 状态，并提供桌面通知；不写入键盘，键盘配置仍由 VIA 完成。",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
