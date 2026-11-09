@@ -7,8 +7,10 @@ Royal Kludge **RK98PRO**（QMK 路径 `royalkludge/rk98pro_us_triple_mode`）的
 ## 特性
 
 - 98% 配列（100 键），三模：USB / 蓝牙 ×3 / 2.4G
-- RGB Matrix 逐键背光 + 6 颗侧灯；20 个内置灯效、7 个自定义灯效（`HS_*`）与按键 RGB 录制
-- 6 层默认键位，Windows / macOS 双布局；VIA 改键、灯效、侧灯、电源与录制配置
+- RGB Matrix 逐键背光 + 6 颗状态侧灯；20 个内置灯效、7 个自定义灯效（`HS_*`）与按键 RGB 录制
+- 6 层默认键位，Windows / macOS 双布局；VIA 改键、灯效、侧灯模式、电源与录制配置
+
+> 6 颗侧灯当前用于充电、连接和低电状态提示；`Lighting → Side Light` 的持久模式只保存模式值，不驱动持久灯光，也不影响主键背光。
 - 实用功能：`Fn + M` 鼠标模式、`Fn + X/C/V` 动态宏、`Fn + Caps Lock` Caps Word
 - 防连击：`Fn + Z` 开关短按键过滤（同键松开后 20ms 内的重复按下会被忽略）
 - 去抖固定 **10ms**
@@ -16,8 +18,8 @@ Royal Kludge **RK98PRO**（QMK 路径 `royalkludge/rk98pro_us_triple_mode`）的
 
 ### 电源与续航
 
-- 空闲 30 秒调光，2 分钟关闭 RGB 与侧灯；USB / 无线默认启用，按键立即恢复
-- 低电 15% 时限制亮度，并用侧灯提示
+- 空闲 30 秒调光，2 分钟关闭 RGB 与状态侧灯；USB / 无线默认启用，按键立即恢复
+- 低电 15% 时限制亮度，并用侧灯状态提示
 - 电量降到 3% 时数字排显示电量条，侧灯红色闪烁约 20 秒后进入保护深睡；深睡后按键和模式开关无效，插入充电线 / USB 才能唤醒
 - 电量链路消抖与平滑：充电线 500ms、满电引脚 2s、原始电量 5 点中值 + EMA(1/4)；充满判定要求稳定满电信号且平滑电量不低于 98%
 - 未知电量保持未知，不显示为 100%
@@ -164,7 +166,7 @@ make royalkludge/rk98pro_us_triple_mode:default:flash
 
 VIA 中还提供：
 
-- `Lighting → Side Light`：保存 6 颗侧灯的模式值或选择 `Off`；当前构建未启用独立侧灯驱动，该选项只保存模式，不会驱动灯光，也不会改变主键背光。
+- `Lighting → Side Light`：保存 6 颗侧灯的模式值或选择 `Off`；当前构建未启用独立侧灯驱动，该选项的持久模式只保存模式，不会驱动灯光，也不会改变主键背光。充电、连接和低电状态提示仍由固件通过 RGB Matrix 使用侧灯，不受该选项影响。
 - `Lighting → Key RGB Record`：选择录制通道（1~4）、开始/结束录制、清空当前通道、复制到下一通道。
 - `System → General`：睡眠超时、防连击、电量/连接状态和“在键盘上显示电量”。
 - `System → General → Anti-Bounce Filter`：开 / 关短按键过滤（等同 `Fn + Z`）。
