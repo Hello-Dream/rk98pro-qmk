@@ -110,7 +110,7 @@ make royalkludge/rk98pro_us_triple_mode:default
 
 ## 云端编译（GitHub Actions）
 
-仓库自带 `.github/workflows/build.yml`：push 或在 Actions 页手动触发后，会在 QMK 官方容器（`ghcr.io/qmk/qmk_cli`）里检出 **`qmk/qmk_firmware`** 的固定提交 `f5db9621`、叠加本仓库的 `keyboards/` 并编译固件；同时运行上位机的 lint、类型检查、单元测试与 Rust 测试。
+仓库自带 `.github/workflows/build.yml`：push 或在 Actions 页手动触发后，会在 QMK 官方容器（`ghcr.io/qmk/qmk_cli`）里检出 **`qmk/qmk_firmware`** 的固定提交 `f5db9621`、叠加本仓库的 `keyboards/` 并编译固件；同时运行上位机的 lint、类型检查、生产构建、单元测试与 Rust 测试。
 
 推送 `v*` tag 时，workflow 额外在 Windows / Linux 的 x64 与 ARM64 上构建桌面安装包，并把固件、VIA JSON 和全部上位机产物作为 Release 附件发布。普通 push 不上传固件或安装包。
 
