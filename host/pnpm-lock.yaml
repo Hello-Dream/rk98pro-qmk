@@ -193,18 +193,12 @@ importers:
       react-dom:
         specifier: ^19.1.1
         version: 19.3.1(react@19.3.1)
-      react-hook-form:
-        specifier: ^7.66.0
-        version: 7.91.0(@types/react@19.3.0)(react@19.3.1)
       react-router-dom:
         specifier: ^7.9.5
         version: 7.18.5(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       tailwind-merge:
         specifier: ^3.3.1
         version: 3.7.0
-      zod:
-        specifier: ^4.1.12
-        version: 4.6.7
       zustand:
         specifier: ^5.0.8
         version: 5.0.16(@types/react@19.3.0)(react@19.3.1)
@@ -257,9 +251,6 @@ importers:
       jsdom:
         specifier: ^27.1.0
         version: 27.4.0(supports-color@7.2.0)
-      playwright:
-        specifier: ^1.56.1
-        version: 1.64.1
       tailwindcss:
         specifier: ^4.1.16
         version: 4.3.4
@@ -1971,16 +1962,6 @@ packages:
     resolution: {integrity: sha512-Y0bARz53lhEC1NMCASs0/j+faB/zqt3R8hpvg1e8+61ZVJ4UL0UdC4cBbXfZMcIuhrfgeILTLe+ZeBCavQPtKQ==}
     peerDependencies:
       react: ^19.3.1
-
-  react-hook-form@7.91.0:
-    resolution: {integrity: sha512-5BEBUnCBwa28AFXYTYmOaB/+CSpJ/+CWVASHEvIGUzFdHyUiPHeRhG7r5hOZ8nZi0yP7pbHdFNXO/p31EKTJFQ==}
-    engines: {node: '>=18.0.0'}
-    peerDependencies:
-      '@types/react': '*'
-      react: ^16.8.0 || ^17 || ^18 || ^19
-    peerDependenciesMeta:
-      '@types/react':
-        optional: true
 
   react-is@17.0.2:
     resolution: {integrity: sha512-w2GsyukL62IJnlaff/nRegPQR94C/XXamvMWmSHRJ4y7Ts/4ocGRmTHvOs8PSE6pB3dWOrD/nueuU5sduBsQ4w==}
@@ -3881,12 +3862,6 @@ snapshots:
     dependencies:
       react: 19.3.1
       scheduler: 0.28.0
-
-  react-hook-form@7.91.0(@types/react@19.3.0)(react@19.3.1):
-    dependencies:
-      react: 19.3.1
-    optionalDependencies:
-      '@types/react': 19.3.0
 
   react-is@17.0.2: {}
 
