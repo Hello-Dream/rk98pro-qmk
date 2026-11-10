@@ -78,7 +78,8 @@ impl HistoryStore {
     }
 
     /// 在线时按 5 分钟或状态变化采样；离线时只记录状态变化，避免重试刷屏。
-    pub fn record_status(&mut self, status: Option<&Status>, now: u64) {
+    /// 返回是否真正追加了样本，供监视线程决定是否推送历史更新事件。
+    pub fn record_status(&mut self, status: Option<&Status>, now: u64) -> bool {
         let sample = match status {
             Some(status) if status.online => Sample {
                 t: now,
@@ -112,15 +113,17 @@ impl HistoryStore {
             .map(|last| now.saturating_sub(last.t) >= SAMPLE_INTERVAL)
             .unwrap_or(true);
         if !changed && !due {
-            return;
+            return false;
         }
 
         self.samples.push(sample);
         self.prune(now);
         self.persist();
+        true
     }
 
-    pub fn record_event(&mut self, kind: &str, title: &str, message: &str, now: u64) {
+    /// 记录一条通知事件；当前总会追加，返回 `true` 便于调用方统一聚合。
+    pub fn record_event(&mut self, kind: &str, title: &str, message: &str, now: u64) -> bool {
         self.events.push(HistoryEvent {
             t: now,
             kind: kind.to_string(),
@@ -129,6 +132,7 @@ impl HistoryStore {
         });
         self.prune(now);
         self.persist();
+        true
     }
 
     fn prune(&mut self, now: u64) {
@@ -206,17 +210,32 @@ mod tests {
         let mut store = HistoryStore::load(path.clone());
         let now = 1_700_000_000;
 
-        store.record_status(Some(&status(80, CHARGING_DISCHARGING)), now);
-        store.record_status(Some(&status(80, CHARGING_DISCHARGING)), now + 30);
+        assert!(store.record_status(Some(&status(80, CHARGING_DISCHARGING)), now));
+        assert!(!store.record_status(Some(&status(80, CHARGING_DISCHARGING)), now + 30));
         assert_eq!(store.snapshot().samples.len(), 1);
 
-        store.record_status(Some(&status(79, CHARGING_DISCHARGING)), now + 60);
+        assert!(store.record_status(Some(&status(79, CHARGING_DISCHARGING)), now + 60));
         assert_eq!(store.snapshot().samples.len(), 2);
 
-        store.record_status(Some(&status(79, CHARGING_CHARGING)), now + 90);
+        assert!(store.record_status(Some(&status(79, CHARGING_CHARGING)), now + 90));
         let snapshot = store.snapshot();
         assert_eq!(snapshot.samples.len(), 3);
         assert_eq!(snapshot.samples[2].charging, CHARGING_CHARGING);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn records_due_and_offline_samples() {
+        let path = temp_path();
+        let mut store = HistoryStore::load(path.clone());
+        let now = 1_700_000_000;
+        let online = status(80, CHARGING_DISCHARGING);
+
+        assert!(store.record_status(Some(&online), now));
+        assert!(!store.record_status(Some(&online), now + SAMPLE_INTERVAL - 1));
+        assert!(store.record_status(Some(&online), now + SAMPLE_INTERVAL));
+        assert!(store.record_status(None, now + SAMPLE_INTERVAL + 1));
 
         let _ = std::fs::remove_file(path);
     }
@@ -228,7 +247,12 @@ mod tests {
         let now = 1_700_000_000;
 
         for index in 0..(MAX_EVENTS + 5) {
-            store.record_event("low_battery", "低电", &format!("第 {index} 条"), now + index as u64);
+            assert!(store.record_event(
+                "low_battery",
+                "低电",
+                &format!("第 {index} 条"),
+                now + index as u64
+            ));
         }
 
         let snapshot = store.snapshot();

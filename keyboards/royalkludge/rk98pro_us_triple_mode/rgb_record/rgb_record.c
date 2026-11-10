@@ -27,7 +27,10 @@ typedef uint16_t (*rgbrec_effects_t)[MATRIX_COLS];
 rgbrec_effects_t p_rgbrec_effects = NULL;
 
 static uint16_t rgbrec_hs_lists[] = RGB_RECORD_HS_LISTS;
-static uint8_t rgbrec_buffer[MATRIX_ROWS * MATRIX_COLS * 2];
+static uint8_t  rgbrec_buffer[MATRIX_ROWS * MATRIX_COLS * 2];
+/* LED 索引 → 打包后的矩阵位置 (row << 8) | col；0xFFFF 表示没有对应位置。 */
+static uint16_t rgbrec_led_map[RGB_MATRIX_LED_COUNT];
+static bool     rgbrec_led_map_ready = false;
 
 //clang-format off
 /* Fn+PrtSc 循环的常用内置灯效。必须使用当前 keyboard.json 已启用的效果宏，
@@ -81,23 +84,20 @@ static rgbrec_info_t rgbrec_info = {
 
 extern const uint16_t PROGMEM rgbrec_default_effects[RGBREC_CHANNEL_NUM][MATRIX_ROWS][MATRIX_COLS];
 
-static bool find_matrix_row_col(uint8_t index, uint8_t *row, uint8_t *col) {
-    uint8_t i, j;
+/* 从 g_led_config 反向建立 LED 索引到矩阵行列的查找表。 */
+static void rgbrec_build_led_map(void) {
+    memset(rgbrec_led_map, 0xFF, sizeof(rgbrec_led_map));
 
-    for (i = 0; i < MATRIX_ROWS; i++) {
-        for (j = 0; j < MATRIX_COLS; j++) {
-            if (g_led_config.matrix_co[i][j] != NO_LED) {
-                if (g_led_config.matrix_co[i][j] == index) {
-                    *row = i;
-                    *col = j;
-
-                    return true;
-                }
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+            uint8_t index = g_led_config.matrix_co[row][col];
+            if (index != NO_LED && index < RGB_MATRIX_LED_COUNT) {
+                rgbrec_led_map[index] = ((uint16_t)row << 8) | col;
             }
         }
     }
 
-    return false;
+    rgbrec_led_map_ready = true;
 }
 
 static inline RGB hs_to_rgb(uint8_t h, uint8_t s) {
@@ -122,6 +122,7 @@ void rgbrec_init(uint8_t channel) {
     rgbrec_info.channel = channel;
     rgbrec_info.value   = rgb_matrix_get_val();
 
+    rgbrec_build_led_map();
     rgbrec_read_current_channel(rgbrec_info.channel);
 }
 
@@ -240,18 +241,25 @@ static inline void rgb_matrix_set_hs(int index, uint16_t hs) {
 }
 
 void rgbrec_play(uint8_t led_min, uint8_t led_max) {
-    uint8_t row = 0xFF, col = 0xFF;
-    uint16_t hs_color;
+    if (p_rgbrec_effects == NULL) {
+        return;
+    }
+    if (!rgbrec_led_map_ready) {
+        rgbrec_build_led_map();
+    }
 
     rgbrec_info.value = rgb_matrix_get_val();
 
     for (uint8_t i = led_min; i < led_max; i++) {
-        if (find_matrix_row_col(i, &row, &col)) {
-            if (p_rgbrec_effects != NULL) {
-                hs_color = p_rgbrec_effects[row][col];
-                rgb_matrix_set_hs(i, hs_color);
-            }
+        uint16_t position = rgbrec_led_map[i];
+        if (position == 0xFFFF) {
+            continue;
         }
+
+        uint8_t  row      = (uint8_t)(position >> 8);
+        uint8_t  col      = (uint8_t)(position & 0xFF);
+        uint16_t hs_color = p_rgbrec_effects[row][col];
+        rgb_matrix_set_hs(i, hs_color);
     }
 }
 

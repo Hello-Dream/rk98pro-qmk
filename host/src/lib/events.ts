@@ -4,19 +4,21 @@ import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from './queries';
 import type { Status } from './types';
 
-/** 只监听只读状态事件；事件缺失时由 React Query 的定时读取兜底。 */
+/** 只监听只读状态事件；历史变化由后端单独通知，事件缺失时由 React Query 的定时读取兜底。 */
 export function useDeviceEvents() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const unlisten = listen<Status | null>('status-updated', (event) => {
+    const statusListener = listen<Status | null>('status-updated', (event) => {
       queryClient.setQueryData(queryKeys.status, event.payload);
+    });
+    const historyListener = listen('history-updated', () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.history });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.wpm });
     });
 
     return () => {
-      void unlisten.then((dispose) => dispose());
+      void statusListener.then((dispose) => dispose());
+      void historyListener.then((dispose) => dispose());
     };
   }, [queryClient]);
 }

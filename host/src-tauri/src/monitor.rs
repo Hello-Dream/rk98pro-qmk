@@ -378,16 +378,19 @@ fn apply_status(
     *last_seq = Some(status.seq);
 
     publish_status(app, Some(status.clone()));
-    record_status(app, Some(&status));
+    let sample_appended = record_status(app, Some(&status));
     record_wpm(app, &status);
     let events = tracker.update(Some(&status), Instant::now());
-    notify_all(app, &events);
+    let event_appended = notify_all(app, &events);
+    if history_event_needed(sample_appended, event_appended) {
+        emit_history_updated(app);
+    }
 }
 
 fn handle_offline(app: &AppHandle, tracker: &mut StatusTracker, last_had_status: &mut bool) {
     let events = tracker.update(None, Instant::now());
-    notify_all(app, &events);
-    record_status(app, None);
+    let event_appended = notify_all(app, &events);
+    let sample_appended = record_status(app, None);
     if let Some(state) = app.try_state::<MonitorState>() {
         if let Ok(mut wpm) = state.wpm.lock() {
             wpm.mark_offline();
@@ -397,14 +400,27 @@ fn handle_offline(app: &AppHandle, tracker: &mut StatusTracker, last_had_status:
         publish_status(app, None);
         *last_had_status = false;
     }
+    if history_event_needed(sample_appended, event_appended) {
+        emit_history_updated(app);
+    }
 }
 
-fn record_status(app: &AppHandle, status: Option<&Status>) {
+fn history_event_needed(sample_appended: bool, event_appended: bool) -> bool {
+    sample_appended || event_appended
+}
+
+fn emit_history_updated(app: &AppHandle) {
+    log::debug!("history-updated：历史数据已追加");
+    let _ = app.emit("history-updated", ());
+}
+
+fn record_status(app: &AppHandle, status: Option<&Status>) -> bool {
     if let Some(state) = app.try_state::<MonitorState>() {
         if let Ok(mut history) = state.history.lock() {
-            history.record_status(status, now_epoch());
+            return history.record_status(status, now_epoch());
         }
     }
+    false
 }
 
 fn record_wpm(app: &AppHandle, status: &Status) {
@@ -415,22 +431,24 @@ fn record_wpm(app: &AppHandle, status: &Status) {
     }
 }
 
-fn record_event(app: &AppHandle, event: &AppNotification) {
+fn record_event(app: &AppHandle, event: &AppNotification) -> bool {
     if let Some(state) = app.try_state::<MonitorState>() {
         if let Ok(mut history) = state.history.lock() {
-            history.record_event(event.kind, &event.title, &event.message, now_epoch());
+            return history.record_event(event.kind, &event.title, &event.message, now_epoch());
         }
     }
+    false
 }
 
-fn notify_all(app: &AppHandle, events: &[AppNotification]) {
+fn notify_all(app: &AppHandle, events: &[AppNotification]) -> bool {
     let preferences = app
         .try_state::<MonitorState>()
         .and_then(|state| state.preferences.lock().ok().map(|store| store.get()))
         .unwrap_or_default();
 
+    let mut recorded = false;
     for event in events {
-        record_event(app, event);
+        recorded |= record_event(app, event);
         if !preferences.allows(event.kind) {
             continue;
         }
@@ -444,6 +462,7 @@ fn notify_all(app: &AppHandle, events: &[AppNotification]) {
             log::warn!("发送 {} 通知失败：{error}", event.kind);
         }
     }
+    recorded
 }
 
 fn publish_status(app: &AppHandle, status: Option<Status>) {
@@ -605,6 +624,14 @@ mod tests {
                 .len(),
             0
         );
+    }
+
+    #[test]
+    fn history_event_only_when_history_appended() {
+        assert!(!history_event_needed(false, false));
+        assert!(history_event_needed(true, false));
+        assert!(history_event_needed(false, true));
+        assert!(history_event_needed(true, true));
     }
 
     #[test]
