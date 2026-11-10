@@ -389,6 +389,8 @@ jobs:
         with:
           name: RK98PRO 三模 QMK 固件与上位机 ${{ github.ref_name }}
           body_path: RELEASE_NOTES.md
+          # 带 -test / -rc 等后缀的 tag 视为预发布，避免覆盖稳定版 latest
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             release-assets/firmware/*.bin
             keyboards/royalkludge/rk98pro_us_triple_mode/rk98pro_us_triple_mode.json
