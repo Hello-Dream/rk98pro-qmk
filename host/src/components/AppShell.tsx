@@ -9,6 +9,7 @@ import { Button } from './ui/button';
 import { ToastViewport } from './ui/toast';
 import { cn } from './ui/utils';
 import NotificationSettingsDialog from '../features/notifications/NotificationSettingsDialog';
+import MonitorErrorBanner from './MonitorErrorBanner';
 
 const NAV = [
   { to: '/', label: '状态', icon: Gauge, title: '键盘状态' },
@@ -110,6 +111,7 @@ export default function AppShell() {
         </header>
 
         <div className="mx-auto w-full max-w-6xl flex-1 p-5">
+          <MonitorErrorBanner />
           <Outlet />
         </div>
 

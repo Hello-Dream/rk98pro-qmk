@@ -100,24 +100,36 @@ uint8_t hs_power_get_config(uint8_t value_id) {
 
 void hs_power_set_config(uint8_t value_id, uint8_t value) {
     switch (value_id) {
-        case id_power_idle_dim:
-            hs_power.idle_dim = value <= 4 ? value : 2;
-            break;
-        case id_power_idle_off:
-            hs_power.idle_off = value <= 4 ? value : 2;
-            break;
-        case id_power_usb_save:
-            hs_power.usb_save = value ? 1 : 0;
-            break;
-        case id_power_low_bat_warn:
-            hs_power.low_bat_level = value <= 4 ? value : 3;
-            break;
-        case id_power_low_bat_brightness:
-            hs_power.low_bat_brightness = value & 0x03;
-            break;
-        case id_power_status_led:
-            hs_power.status_led = value ? 1 : 0;
-            break;
+        case id_power_idle_dim: {
+            uint8_t next = value <= 4 ? value : 2;
+            if (hs_power.idle_dim == next) return;
+            hs_power.idle_dim = next;
+        } break;
+        case id_power_idle_off: {
+            uint8_t next = value <= 4 ? value : 2;
+            if (hs_power.idle_off == next) return;
+            hs_power.idle_off = next;
+        } break;
+        case id_power_usb_save: {
+            uint8_t next = value ? 1 : 0;
+            if (hs_power.usb_save == next) return;
+            hs_power.usb_save = next;
+        } break;
+        case id_power_low_bat_warn: {
+            uint8_t next = value <= 4 ? value : 3;
+            if (hs_power.low_bat_level == next) return;
+            hs_power.low_bat_level = next;
+        } break;
+        case id_power_low_bat_brightness: {
+            uint8_t next = value & 0x03;
+            if (hs_power.low_bat_brightness == next) return;
+            hs_power.low_bat_brightness = next;
+        } break;
+        case id_power_status_led: {
+            uint8_t next = value ? 1 : 0;
+            if (hs_power.status_led == next) return;
+            hs_power.status_led = next;
+        } break;
         default:
             return;
     }
@@ -147,8 +159,12 @@ uint32_t hs_sleep_timeout_ms(void) {
 }
 
 void hs_set_sleep_timeout(uint8_t sleep_timeout){
+    if (hs_settings.sleep_timeout == sleep_timeout) {
+        return; // 值未变不标记 dirty，避免 VIA 重复写入触发 EEPROM
+    }
     hs_settings.sleep_timeout = sleep_timeout;
     lpwr_set_timeout_value(hs_sleep_timeout_ms()); // 让 VIA 设置真正生效（原来从未下发，恒为 5 分钟）
+    hs_settings_update();
 }
 
 void hs_power_init(void) {

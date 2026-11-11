@@ -2,7 +2,7 @@
 
 Royal Kludge **RK98PRO**（QMK 路径 `royalkludge/rk98pro_us_triple_mode`）的 QMK 固件、VIA 定义与只读桌面监控。
 
-本仓库以 overlay 形式提供键盘固件：需要叠加到官方 `qmk/qmk_firmware` 的固定提交后编译，不包含完整 QMK 源码树。当前测试版本 **v1.0.2-test.1**（产品版本 `1.0.2`），是 v1.0.1 的运行时优化版本；固件、VIA 定义与上位机版本号一致。
+本仓库以 overlay 形式提供键盘固件：需要叠加到官方 `qmk/qmk_firmware` 的固定提交后编译，不包含完整 QMK 源码树。当前稳定版本 **v1.0.2**（产品版本 `1.0.2`），是 v1.0.1 的运行时、Linux 交付与诊断优化版本；固件、VIA 定义与上位机版本号一致。
 
 ## 特性
 
@@ -38,9 +38,9 @@ Royal Kludge **RK98PRO**（QMK 路径 `royalkludge/rk98pro_us_triple_mode`）的
 
 ## 下载
 
-当前测试版：**[v1.0.2-test.1](https://github.com/Hello-Dream/rk98pro-qmk/releases/tag/v1.0.2-test.1)**（预发布）
+当前稳定版：**[v1.0.2](https://github.com/Hello-Dream/rk98pro-qmk/releases/tag/v1.0.2)**
 
-稳定版：[v1.0.1](https://github.com/Hello-Dream/rk98pro-qmk/releases/latest)
+上一稳定版：[v1.0.1](https://github.com/Hello-Dream/rk98pro-qmk/releases/tag/v1.0.1)
 
 | 文件 | 用途 |
 | --- | --- |
@@ -182,14 +182,30 @@ VIA 中还提供：
 `host/` 提供 Tauri 2 只读桌面监控（Windows / Linux），通过 VIA raw HID 读取并显示：
 
 - 电量、充电、模式/链路、电源阶段、层、锁定键、WPM、RGB/录制状态；
-- 6 小时 / 24 小时 / 7 天电量历史，曲线平滑并保留离线空档；
+- 6 小时 / 24 小时 / 7 天电量历史，曲线平滑并保留离线空档；历史按 30 秒防抖写入，正常退出前刷新；
 - WPM 当前、峰值、5 分钟平均和曲线，统计只保存在本机内存，可手动重置；
 - 低电、充满、断连/重连桌面通知，可在上位机中分别开关；
-- 托盘电池图标、状态摘要、打开面板、立即刷新和退出。
+- 托盘电池图标、状态摘要、打开面板、立即刷新和退出；
+- 找不到设备时区分旧固件不兼容、Linux 权限/udev、未找到设备或 HID 超时，并给出处理建议。
 
 上位机不提供改键、灯光、键盘设置、无线切换、备份或诊断写入；这些配置仍由 VIA 完成。上位机只发送只读的 `GET 0x22`，不向键盘发送任何 SET 或控制命令。
 
 2.4G 模式下，键盘把 raw HID 报告经无线模块转发给接收器，上位机直接和接收器的 `usage_page=0xFF60` / `usage=0x61` 接口通信。USB 有线模式下则由键盘自身暴露同一接口。蓝牙模式只提供标准 HID 键盘报告，没有 VIA raw HID 通道，因此上位机无法通过蓝牙读取状态；需要改用 USB 线或 2.4G 接收器。
+
+固件在最近 2 秒收到过状态 GET 时每 250ms 检查一次变化，否则降到每 1 秒，降低无线主循环和空闲 CPU 开销。电量事件保持 60 秒节流；其他状态事件会携带最新电量，窗口聚焦时电量仍会在 5 秒内通过事件或 1 秒心跳校正，失焦或托盘隐藏时由 30 秒心跳校正。上位机事件轮询在聚焦时最多等待 200ms，失焦/托盘 1 秒；界面状态主要依赖 `status-updated` 事件，5 秒轮询已移除，30 秒读取只作兜底。
+
+### Linux HID 权限
+
+- **deb / rpm**：安装包自动把 `99-rk98pro.rules` 安装到 `/usr/lib/udev/rules.d/`，安装后重新插拔键盘或接收器即可。
+- **AppImage**：需要手动安装规则，然后重新加载 udev：
+
+```bash
+sudo cp 99-rk98pro.rules /etc/udev/rules.d/99-rk98pro.rules
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+规则文件位于 `host/packaging/99-rk98pro.rules`，匹配 VID `342d`、PID `e451`。若上位机提示无法访问 HID 接口，先确认规则已安装并重新插拔；仍失败时检查是否有其他 VIA/监控程序占用该接口。
 
 v1.0.2 固件与上位机使用只读状态通道 `0x22` 和 raw HID 事件推送，上位机只发送 GET，不写键盘。`HS_FIRMWARE_VERSION_*` 与 `keyboard.json` 的 `version` 同步，上位机显示发布版本；`HS_SETTINGS_VERSION` 是 EEPROM 布局版本，与发布版本无关。首次刷入会初始化自定义设置、RGB 录制和动态键位；VIA 自定义 ID `0x10`–`0x21` 与 `rk98pro_us_triple_mode.json` 配合使用。协议说明见 [host/README.md](host/README.md)。
 

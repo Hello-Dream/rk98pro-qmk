@@ -92,6 +92,9 @@ bool hs_get_anti_bounce(void) {
 }
 
 void hs_set_anti_bounce(bool enabled) {
+    if (hs_settings.anti_bounce == enabled) {
+        return; // 同值不重复持久化，也不重复白/红闪烁反馈
+    }
     hs_settings.anti_bounce = enabled;
     if (!enabled) {
         hs_skf_reset(); // 关闭时清掉锁定状态

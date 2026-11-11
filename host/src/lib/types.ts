@@ -65,6 +65,11 @@ export interface Status {
   updatedAt: number;
 }
 
+export interface MonitorError {
+  kind: string;
+  message: string;
+}
+
 export interface HistorySample {
   t: number;
   battery: number | null;

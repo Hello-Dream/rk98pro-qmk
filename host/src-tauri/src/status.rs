@@ -60,7 +60,11 @@ impl Status {
             )));
         }
 
-        let battery = if value[6] <= 100 { Some(value[6]) } else { None };
+        let battery = if value[6] <= 100 {
+            Some(value[6])
+        } else {
+            None
+        };
         let mut charging = if value[7] <= CHARGING_FULL {
             value[7]
         } else {
@@ -93,7 +97,11 @@ impl Status {
             default_layer: value[14],
             wpm: value[15],
             idle_seconds: u16::from_le_bytes([value[16], value[17]]),
-            rgbrec_channel: if value[18] <= 3 { Some(value[18]) } else { None },
+            rgbrec_channel: if value[18] <= 3 {
+                Some(value[18])
+            } else {
+                None
+            },
             rgb_mode: value[19],
             rgb_brightness: value[20],
             wireless_version: value[21],

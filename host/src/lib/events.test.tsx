@@ -9,13 +9,20 @@ import type { Status } from './types';
 const mocks = vi.hoisted(() => ({
   listeners: new Map<string, (event: { payload: unknown }) => void>(),
   unlistenStatus: vi.fn(),
+  unlistenError: vi.fn(),
   unlistenHistory: vi.fn(),
 }));
 
 vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn((name: string, handler: (event: { payload: unknown }) => void) => {
     mocks.listeners.set(name, handler);
-    return Promise.resolve(name === 'status-updated' ? mocks.unlistenStatus : mocks.unlistenHistory);
+    if (name === 'status-updated') {
+      return Promise.resolve(mocks.unlistenStatus);
+    }
+    if (name === 'monitor-error') {
+      return Promise.resolve(mocks.unlistenError);
+    }
+    return Promise.resolve(mocks.unlistenHistory);
   }),
 }));
 
@@ -57,11 +64,11 @@ function createWrapper() {
   return { queryClient, wrapper };
 }
 
-/** 挂载事件 Hook，并等待两个监听器注册完成。 */
+/** 挂载事件 Hook，并等待三个监听器注册完成。 */
 async function renderEvents() {
   const { queryClient, wrapper } = createWrapper();
   const hook = renderHook(() => useDeviceEvents(), { wrapper });
-  await waitFor(() => expect(mocks.listeners.size).toBe(2));
+  await waitFor(() => expect(mocks.listeners.size).toBe(3));
   return { ...hook, queryClient };
 }
 
@@ -69,6 +76,7 @@ describe('设备事件', () => {
   beforeEach(() => {
     mocks.listeners.clear();
     mocks.unlistenStatus.mockClear();
+    mocks.unlistenError.mockClear();
     mocks.unlistenHistory.mockClear();
   });
 
@@ -101,12 +109,26 @@ describe('设备事件', () => {
     unmount();
   });
 
-  it('卸载时释放两个监听器', async () => {
+  it('诊断事件更新错误缓存', async () => {
+    const { queryClient, unmount } = await renderEvents();
+    const setQueryData = vi.spyOn(queryClient, 'setQueryData');
+    const payload = { kind: 'access_denied', message: 'Permission denied' };
+
+    act(() => {
+      mocks.listeners.get('monitor-error')!({ payload });
+    });
+
+    expect(setQueryData).toHaveBeenCalledWith(queryKeys.monitorError, payload);
+    unmount();
+  });
+
+  it('卸载时释放三个监听器', async () => {
     const { unmount } = await renderEvents();
 
     unmount();
 
     await waitFor(() => expect(mocks.unlistenStatus).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mocks.unlistenError).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(mocks.unlistenHistory).toHaveBeenCalledTimes(1));
   });
 });

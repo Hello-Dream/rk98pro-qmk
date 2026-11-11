@@ -77,7 +77,7 @@ export default function WpmCard() {
 
       <div className="mt-3 flex items-center justify-between gap-3">
         <p className="text-xs text-slate-500">
-          窗口打开时按 1 秒采样；托盘时 30 秒，曲线会变稀疏。
+          窗口聚焦时按 1 秒采样；失焦或托盘时 30 秒，曲线会变稀疏。
         </p>
         <Button size="sm" disabled={reset.isPending} onClick={resetStats}>
           <RotateCcw className="h-3.5 w-3.5" />

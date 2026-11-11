@@ -5,6 +5,7 @@ use std::fmt;
 #[derive(Debug, Clone)]
 pub enum ViaError {
     NoDevice(String),
+    AccessDenied(String),
     Hid(String),
     Timeout(String),
     Unsupported(u8),
@@ -15,6 +16,7 @@ impl fmt::Display for ViaError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NoDevice(message) => write!(f, "{message}"),
+            Self::AccessDenied(message) => write!(f, "HID 权限不足：{message}"),
             Self::Hid(message) => write!(f, "HID 错误：{message}"),
             Self::Timeout(message) => write!(f, "{message}"),
             Self::Unsupported(value) => write!(f, "固件不支持 0x{value:02X}"),

@@ -5,7 +5,20 @@
 > [!NOTE]
 > 自定义 EEPROM 设置（`hs_settings`、按键 RGB 录制、侧灯 HSV 槽位）带有版本号与 CRC。首次刷入或检测到版本/CRC 不符时，固件会恢复默认设置，并同步刷新 VIA 缓存，正常无需手动清空 EEPROM；降级或数据异常时仍可按 [README.md](README.md#upgrade-eeprom) 手动清空。
 
-## [1.0.2] - 2026-11-10
+## [1.0.2] - 2026-11-11
+
+### 运行时与交付优化
+
+- 固件状态检查改为自适应：最近 2 秒有状态 GET 时 250ms，否则 1 秒；托盘心跳期间不再固定 50ms 构建快照。
+- 移除主循环中重复的电池采样调用，`hs_send_bat_status()` 内保留唯一采样点。
+- `hs_power_set_config`、睡眠超时、侧灯模式、防连击和背光总开关增加“值未变不写 EEPROM”短路；同值侧灯仍重放硬件，同通道录制仍保留预览。
+- 电池滤波、3% 停止阈值确认和充满锁存抽取为 `hs/battery_policy.c/h` 纯逻辑，新增 `tests/firmware/test_battery_policy.c` 主机侧测试。
+- 上位机事件轮询改为聚焦 200ms、失焦/托盘 1 秒；`useStatus` 的 5 秒轮询改为 30 秒兜底，主路径仍是 `status-updated` 事件。
+- 历史 JSON 改为内存更新 + 30 秒防抖落盘，正常退出时刷新，写入失败保留待写数据并延后重试。
+- Linux deb/rpm 自动安装 `99-rk98pro.rules` 到 `/usr/lib/udev/rules.d/`；AppImage 文档给出手动安装步骤。
+- 上位机新增只读 `get_monitor_error` 命令与 `monitor-error` 事件，区分钟不兼容、权限/udev、未找到设备和 HID 超时，并显示可操作提示。
+- CI 增加 Rust `fmt`/`clippy`、Playwright e2e、固件策略测试和 tag/版本一致性校验；tag 构建也经过 `verify` 门禁。
+- 不修改 EEPROM 布局、`HS_SETTINGS_VERSION`、`HS_STATUS_SNAPSHOT_VERSION`、VIA ID、键码顺序或灯效顺序。
 
 ### 测试版（v1.0.2-test.1）
 

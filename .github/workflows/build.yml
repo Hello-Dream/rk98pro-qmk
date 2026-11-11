@@ -13,10 +13,9 @@ permissions:
 
 jobs:
   verify:
-    # 普通 push 只做校验与测试，不生成桌面安装包
-    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+    # 普通 push 与 tag 构建都先跑校验；tag 发布还会校验 tag 与产品版本
     runs-on: ubuntu-22.04
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - name: Checkout this keyboard repo
         uses: actions/checkout@v7
@@ -38,6 +37,8 @@ jobs:
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
@@ -76,6 +77,27 @@ jobs:
       - name: Validate VIA definition
         run: python3 scripts/validate_via_json.py
 
+      - name: Check release tag matches product version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: python3 scripts/check_release_tag.py --tag "$GITHUB_REF_NAME"
+
+      - name: Check Rust formatting
+        working-directory: host/src-tauri
+        run: cargo fmt -- --check
+
+      - name: Lint Rust
+        working-directory: host/src-tauri
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: Test battery policy
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror \
+            -I keyboards/royalkludge/rk98pro_us_triple_mode/hs \
+            keyboards/royalkludge/rk98pro_us_triple_mode/hs/battery_policy.c \
+            tests/firmware/test_battery_policy.c \
+            -o /tmp/test_battery_policy
+          /tmp/test_battery_policy
+
       - name: Check host read-only API surface
         run: |
           if grep -nE "set_device_setting|write_block|keymap_write|rgb_write|wireless_switch|wireless_pair|wireless_clear|capture_key|import_config|show_battery" host/src/lib/api.ts; then
@@ -86,6 +108,14 @@ jobs:
       - name: Test frontend
         working-directory: host
         run: pnpm test
+
+      - name: Install Playwright browser
+        working-directory: host
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Test frontend e2e
+        working-directory: host
+        run: pnpm test:e2e
 
       - name: Test Rust protocol/notification logic
         run: |
@@ -204,6 +234,26 @@ jobs:
       - name: Build desktop app
         working-directory: host
         run: pnpm run ${{ matrix.build_script }} ${{ matrix.build_args }}
+
+      - name: Verify Linux packages include udev rule
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rule="/usr/lib/udev/rules.d/99-rk98pro.rules"
+
+          deb="$(find "${{ matrix.target_dir }}/release/bundle/deb" -name '*.deb' -print -quit)"
+          test -n "$deb"
+          dpkg-deb -c "$deb" | grep -Fq "$rule"
+
+          rpm_file="$(find "${{ matrix.target_dir }}/release/bundle/rpm" -name '*.rpm' -print -quit)"
+          test -n "$rpm_file"
+          if ! command -v rpm >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y rpm
+          fi
+          rpm -qpl "$rpm_file" | grep -Fq "$rule"
+          echo "deb/rpm 均包含 $rule"
 
       - name: Prepare Windows setup
         if: runner.os == 'Windows'
@@ -360,9 +410,9 @@ jobs:
           if-no-files-found: error
 
   release:
-    # 等固件和四个桌面平台全部构建成功后再发布，保证 Release 附件完整
+    # 等校验、固件和四个桌面平台全部成功后再发布，tag 构建不会绕过门禁
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build, desktop]
+    needs: [verify, build, desktop]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:

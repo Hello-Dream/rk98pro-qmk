@@ -45,11 +45,60 @@ fn normalize_report(buffer: &[u8], read: usize) -> &[u8] {
     }
 }
 
+fn classify_open_error(message: String) -> ViaError {
+    let lower = message.to_ascii_lowercase();
+    let denied = [
+        "permission",
+        "access denied",
+        "accessdenied",
+        "udev",
+        "not permitted",
+        "operation not allowed",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle));
+    if denied {
+        ViaError::AccessDenied(message)
+    } else {
+        ViaError::Hid(message)
+    }
+}
+
+fn error_priority(error: &ViaError) -> u8 {
+    match error {
+        ViaError::Protocol(_) | ViaError::Unsupported(_) => 3,
+        ViaError::AccessDenied(_) => 2,
+        ViaError::Timeout(_) | ViaError::Hid(_) => 1,
+        ViaError::NoDevice(_) => 0,
+    }
+}
+
+fn error_with_context(error: ViaError, name: &str) -> ViaError {
+    match error {
+        ViaError::NoDevice(message) => ViaError::NoDevice(format!("{name}：{message}")),
+        ViaError::AccessDenied(message) => ViaError::AccessDenied(format!("{name}：{message}")),
+        ViaError::Hid(message) => ViaError::Hid(format!("{name}：{message}")),
+        ViaError::Timeout(message) => ViaError::Timeout(format!("{name}：{message}")),
+        ViaError::Unsupported(value) => ViaError::Unsupported(value),
+        ViaError::Protocol(message) => ViaError::Protocol(format!("{name}：{message}")),
+    }
+}
+
+fn keep_most_informative(best: &mut Option<ViaError>, error: ViaError) {
+    if best
+        .as_ref()
+        .map(|current| error_priority(&error) > error_priority(current))
+        .unwrap_or(true)
+    {
+        *best = Some(error);
+    }
+}
+
 impl ViaDevice {
     pub fn open(api: &HidApi, info: &DeviceInfo, timeout_ms: i32) -> ViaResult<Self> {
         let device = info
             .open_device(api)
-            .map_err(|error| ViaError::Hid(error.to_string()))?;
+            .map_err(|error| classify_open_error(error.to_string()))?;
         Ok(Self {
             device,
             timeout_ms,
@@ -167,11 +216,7 @@ fn is_known_rk98pro(info: &DeviceInfo) -> bool {
 }
 
 fn normalized_device_text(value: &str) -> String {
-    value
-        .to_ascii_lowercase()
-        .replace(' ', "")
-        .replace('-', "")
-        .replace('_', "")
+    value.to_ascii_lowercase().replace([' ', '-', '_'], "")
 }
 
 fn looks_like_rk98pro(info: &DeviceInfo) -> bool {
@@ -194,7 +239,7 @@ pub fn select_rk98pro_interfaces(api: &HidApi) -> Vec<DeviceInfo> {
     if !exact.is_empty() {
         return exact;
     }
-    all.into_iter().filter(|info| looks_like_rk98pro(info)).collect()
+    all.into_iter().filter(looks_like_rk98pro).collect()
 }
 
 fn interface_name(info: &DeviceInfo) -> String {
@@ -216,7 +261,7 @@ pub fn find_monitor_device(prefer_2g4: bool, timeout_ms: i32) -> ViaResult<ViaDe
 
     let mut online: Option<ViaDevice> = None;
     let mut fallback: Option<ViaDevice> = None;
-    let mut errors = Vec::new();
+    let mut best_error: Option<ViaError> = None;
 
     for info in &interfaces {
         let name = interface_name(info);
@@ -232,19 +277,18 @@ pub fn find_monitor_device(prefer_2g4: bool, timeout_ms: i32) -> ViaResult<ViaDe
                         fallback = Some(device);
                     }
                 }
-                Err(error) => errors.push(format!("{name}：{error}")),
+                Err(error) => {
+                    keep_most_informative(&mut best_error, error_with_context(error, &name))
+                }
             },
-            Err(error) => errors.push(format!("{name}：{error}")),
+            Err(error) => keep_most_informative(&mut best_error, error_with_context(error, &name)),
         }
     }
 
     online.or(fallback).ok_or_else(|| {
-        let detail = if errors.is_empty() {
-            "没有可用接口".to_string()
-        } else {
-            errors.join("；")
-        };
-        ViaError::NoDevice(format!("找到 HID 接口但没有只读状态响应：{detail}"))
+        best_error.unwrap_or_else(|| {
+            ViaError::NoDevice("找到 HID 接口但没有只读状态响应，请重新插拔键盘或接收器".into())
+        })
     })
 }
 
@@ -271,5 +315,51 @@ mod tests {
     #[test]
     fn event_status_constant_is_used() {
         assert_eq!(EVENT_STATUS, 0x01);
+    }
+
+    #[test]
+    fn open_errors_classify_permission_and_udev() {
+        assert!(matches!(
+            classify_open_error("Permission denied".to_string()),
+            ViaError::AccessDenied(_)
+        ));
+        assert!(matches!(
+            classify_open_error("could not open device: access denied".to_string()),
+            ViaError::AccessDenied(_)
+        ));
+        assert!(matches!(
+            classify_open_error("udev rule missing".to_string()),
+            ViaError::AccessDenied(_)
+        ));
+        assert!(matches!(
+            classify_open_error("No such device".to_string()),
+            ViaError::Hid(_)
+        ));
+    }
+
+    #[test]
+    fn error_priority_prefers_specific_causes() {
+        assert!(
+            error_priority(&ViaError::Protocol("old".into()))
+                > error_priority(&ViaError::AccessDenied("permission".into()))
+        );
+        assert!(
+            error_priority(&ViaError::AccessDenied("permission".into()))
+                > error_priority(&ViaError::Timeout("timeout".into()))
+        );
+        assert!(
+            error_priority(&ViaError::Hid("hid".into()))
+                > error_priority(&ViaError::NoDevice("missing".into()))
+        );
+
+        let mut best = None;
+        keep_most_informative(&mut best, ViaError::NoDevice("missing".into()));
+        keep_most_informative(&mut best, ViaError::Timeout("timeout".into()));
+        keep_most_informative(&mut best, ViaError::AccessDenied("permission".into()));
+        keep_most_informative(&mut best, ViaError::Protocol("old".into()));
+        assert!(matches!(best.as_ref(), Some(ViaError::Protocol(_))));
+
+        keep_most_informative(&mut best, ViaError::AccessDenied("later".into()));
+        assert!(matches!(best.as_ref(), Some(ViaError::Protocol(_))));
     }
 }

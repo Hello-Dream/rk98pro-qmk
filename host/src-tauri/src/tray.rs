@@ -148,7 +148,7 @@ fn tooltip(status: Option<&Status>) -> String {
 
 fn show_main_window<R: tauri::Runtime>(app: &AppHandle<R>) {
     if let Some(state) = app.try_state::<MonitorState>() {
-        state.set_window_visible(true);
+        state.set_window_active(true);
         let _ = state.send(Action::Refresh);
     }
     if let Some(window) = app.get_webview_window("main") {
