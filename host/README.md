@@ -5,10 +5,11 @@ RK98PRO 的只读桌面监控。上位机只显示电量、键盘功能状态和
 ## 功能
 
 - 电量、充电、链路、模式、电源阶段、层、锁定键、WPM、RGB/录制状态。
-- 6 小时 / 24 小时 / 7 天电量历史，显示平滑并保留离线空档。
+- 6 小时 / 24 小时 / 7 天电量历史，显示平滑并保留离线空档；历史按 30 秒防抖落盘，正常退出前刷新。
 - WPM 当前、峰值、5 分钟平均和 5 分钟曲线；统计只保存在本机内存，可重置。
 - 低电、充满、断连/重连桌面通知，可分别关闭。
 - 托盘电池图标、状态摘要、打开面板、立即刷新和退出。
+- 找设备失败时显示可操作诊断：旧固件不支持、Linux 权限/udev、未找到设备或 HID 访问异常。
 
 ## 不做
 
@@ -59,8 +60,35 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm exec playwright install --with-deps chromium
+pnpm test:e2e
+cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
+
+固件电池保护纯逻辑测试在仓库根目录运行：
+
+```bash
+cc -std=c11 -Wall -Wextra -Werror \
+  -I keyboards/royalkludge/rk98pro_us_triple_mode/hs \
+  keyboards/royalkludge/rk98pro_us_triple_mode/hs/battery_policy.c \
+  tests/firmware/test_battery_policy.c -o /tmp/test_battery_policy
+/tmp/test_battery_policy
+```
+
+## Linux 安装与 HID 权限
+
+- deb / rpm 会把 `99-rk98pro.rules` 安装到 `/usr/lib/udev/rules.d/`，安装后重新插拔键盘或接收器即可。
+- AppImage 不会自动安装系统规则，需要手动执行：
+
+```bash
+sudo cp 99-rk98pro.rules /etc/udev/rules.d/99-rk98pro.rules
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+然后重新插拔键盘或 2.4G 接收器。规则文件位于仓库 `host/packaging/99-rk98pro.rules`，匹配 VID `342d`、PID `e451`，并给本地活动会话用户授予 hidraw 访问权限（`TAG+="uaccess"`）。
 
 ## 协议
 
@@ -117,18 +145,22 @@ GET 响应的 `value_data[3..]` 和事件 payload 使用同一份 23 字节快�
 
 GET `0x22` 同时把主机会话续期 60 秒。只有会话有效时固件才推送事件；主机停止请求 60 秒后停止推送。
 
-事件触发字段：电量（60 秒节流）、充电、链路、模式、电源阶段、flags、锁定键、层、录制通道、RGB 模式/亮度。WPM 和空闲秒数不单独触发事件。
+事件触发字段：充电、链路、模式、电源阶段、flags、锁定键、层、录制通道、RGB 模式/亮度；电量变化在 60 秒节流窗口允许时推送。其他状态事件会携带最新电量，WPM 和空闲秒数不单独触发事件。
 
 上位机处理规则：
 
 - GET 响应永远采纳，并把 `seq` 设为新基线；
 - 事件只在 `seq` 比基线新时采纳；
-- 事件丢失时由下一次心跳 GET 校正。
+- 事件丢失时由下一次心跳 GET 校正；
+- 窗口聚焦时电量在 5 秒内通过事件或 1 秒心跳校正；失焦或托盘隐藏时由 30 秒心跳校正。
 
 ### 心跳
 
-- 窗口可见：每 1 秒一次 GET，同时为 WPM 提供采样；
-- 托盘隐藏：每 30 秒一次 GET；
+- 窗口聚焦：每 1 秒一次 GET，同时为 WPM 提供采样；
+- 窗口失焦或托盘隐藏：每 30 秒一次 GET；
+- 事件轮询：聚焦时最多等待 200ms，失焦/托盘时最多 1 秒；立即刷新会打断等待；
+- `status-updated` 是 UI 主路径，React Query 的 30 秒读取只作事件丢失/重连兜底；
+- `useWpmStats` 的 2 秒查询只读本机内存，不产生 HID 或磁盘 I/O，托盘态保留该节拍；
 - 断连判定：连续 60 秒无响应。
 
 状态 GET 不重置空闲计时器、无线 blink 计时器，也不按用户活动处理；监控不会阻止键盘调光、关灯或休眠。
@@ -139,6 +171,7 @@ Tauri 命令只有：
 
 ```text
 get_status
+get_monitor_error
 refresh
 get_history
 get_wpm_stats
@@ -148,10 +181,18 @@ set_preferences
 test_notification
 ```
 
-`reset_wpm_stats` 和 `set_preferences` 只写本机内存/JSON，不写键盘。
+`reset_wpm_stats` 和 `set_preferences` 只写本机内存/JSON，不写键盘。`get_monitor_error` 与 `monitor-error` 事件只读本机诊断状态，不改变协议；`status-updated` payload 保持不变。
+
+## 故障排查
+
+- **旧固件**：提示“固件不支持只读状态通道”或快照版本不兼容时，刷入与上位机同版本的固件；不要降级上位机硬连旧快照。
+- **Linux 权限/udev**：提示无法访问 HID 接口时，确认 deb/rpm 已安装规则，或按上面的 AppImage 步骤手动安装；运行 `sudo udevadm control --reload-rules` 后重新插拔。
+- **未找到设备**：确认使用 USB 有线或 2.4G 接收器；蓝牙模式没有 raw HID。接收器未插入、键盘处于蓝牙模式或接口被其他程序独占时都会显示该提示。
+- **HID 超时**：重新插拔键盘/接收器；若仍失败，检查是否有其他 VIA/监控程序占用 `usage_page=0xFF60, usage=0x61` 接口。
 
 ## 已知限制
 
 - 蓝牙模式没有 raw HID，上位机显示离线；请使用 USB 或 2.4G。
-- WPM 在窗口打开时按 1 秒采样；托盘隐藏时降为 30 秒，曲线会变稀疏。
+- WPM 在窗口聚焦时按 1 秒采样；失焦或托盘隐藏时降为 30 秒，曲线会变稀疏。
+- 历史按 30 秒防抖落盘；存储可写且进程持续调度时，异常退出最多丢失 30 秒未落盘采样。
 - 充满判定由固件统一处理；上位机在电量低于 98% 时会把 `FULL` 降级为充电中作为第二道防线。

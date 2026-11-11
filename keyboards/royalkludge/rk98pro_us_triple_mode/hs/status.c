@@ -20,11 +20,13 @@
 
 #include <string.h>
 
-#define HS_STATUS_EVENT_MAGIC  0xE0
-#define HS_STATUS_EVENT_STATUS 0x01
-#define HS_STATUS_SESSION_MS   60000
-#define HS_STATUS_BATTERY_MS   60000
-#define HS_STATUS_MIN_GAP_MS   50
+#define HS_STATUS_EVENT_MAGIC       0xE0
+#define HS_STATUS_EVENT_STATUS      0x01
+#define HS_STATUS_SESSION_MS        60000
+#define HS_STATUS_BATTERY_MS        60000
+#define HS_STATUS_GET_ACTIVE_MS     2000
+#define HS_STATUS_CHECK_ACTIVE_MS   250
+#define HS_STATUS_CHECK_IDLE_MS     1000
 
 extern uint8_t  hs_power_state_code(void);
 extern bool     hs_power_low_battery_active(void);
@@ -33,6 +35,7 @@ extern bool     charging_state;
 
 static uint8_t  hs_status_seq;
 static uint32_t hs_status_session_at;
+static uint32_t hs_status_last_get_at;
 static uint32_t hs_status_last_check;
 static uint32_t hs_status_last_battery_event;
 static bool     hs_status_sent_valid;
@@ -134,6 +137,7 @@ bool hs_status_get(uint8_t *value_data, uint8_t value_len) {
     }
 
     hs_status_session_at = timer_read32();
+    hs_status_last_get_at = hs_status_session_at;
 
     hs_status_snapshot_t snapshot;
     hs_status_build_snapshot(&snapshot);
@@ -150,7 +154,12 @@ void hs_status_task(void) {
     if (timer_elapsed32(hs_status_session_at) >= HS_STATUS_SESSION_MS) {
         return;
     }
-    if (hs_status_last_check && timer_elapsed32(hs_status_last_check) < HS_STATUS_MIN_GAP_MS) {
+
+    // 最近 2 秒有 GET 说明上位机聚焦（约 1 秒轮询），用 250ms 保持界面灵敏；
+    // 失焦或托盘只靠 30 秒心跳续期，降到 1 秒即可，避免无线主循环持续构建快照。
+    bool     host_active = hs_status_last_get_at && timer_elapsed32(hs_status_last_get_at) < HS_STATUS_GET_ACTIVE_MS;
+    uint32_t check_ms    = host_active ? HS_STATUS_CHECK_ACTIVE_MS : HS_STATUS_CHECK_IDLE_MS;
+    if (hs_status_last_check && timer_elapsed32(hs_status_last_check) < check_ms) {
         return;
     }
     hs_status_last_check = now;

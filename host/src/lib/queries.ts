@@ -4,6 +4,7 @@ import type { Preferences, Status } from './types';
 
 export const queryKeys = {
   status: ['status'] as const,
+  monitorError: ['monitor-error'] as const,
   history: ['history'] as const,
   wpm: ['wpm'] as const,
   preferences: ['preferences'] as const,
@@ -13,7 +14,16 @@ export function useStatus() {
   return useQuery({
     queryKey: queryKeys.status,
     queryFn: api.getStatus,
-    refetchInterval: 5000,
+    // 主路径是 status-updated 事件；30 秒只是事件丢失/重连后的兜底。
+    refetchInterval: 30000,
+  });
+}
+
+export function useMonitorError() {
+  return useQuery({
+    queryKey: queryKeys.monitorError,
+    queryFn: api.getMonitorError,
+    staleTime: Infinity,
   });
 }
 

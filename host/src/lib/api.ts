@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { HistorySnapshot, Preferences, Status, WpmStats } from './types';
+import type { HistorySnapshot, MonitorError, Preferences, Status, WpmStats } from './types';
 
 /**
  * 唯一 Tauri invoke 入口。
@@ -7,6 +7,7 @@ import type { HistorySnapshot, Preferences, Status, WpmStats } from './types';
  */
 export const api = {
   getStatus: () => invoke<Status | null>('get_status'),
+  getMonitorError: () => invoke<MonitorError | null>('get_monitor_error'),
   refresh: () => invoke<void>('refresh'),
   getHistory: () => invoke<HistorySnapshot>('get_history'),
   getWpmStats: () => invoke<WpmStats>('get_wpm_stats'),

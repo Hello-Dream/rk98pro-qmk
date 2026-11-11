@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "battery.h"
+#include "battery_policy.h"
 #include QMK_KEYBOARD_H
 
 #include "timer.h"
@@ -10,7 +11,6 @@
 bool charging_state = false;
 bool bat_full_flag  = false;
 
-#define HS_BATTERY_FILTER_SIZE            5
 #define HS_BATTERY_FILTER_MS              1000
 #define HS_BATTERY_PIN_DEBOUNCE_MS        500
 #define HS_BATTERY_FULL_PIN_DEBOUNCE_MS   2000
@@ -19,46 +19,27 @@ bool bat_full_flag  = false;
 #define HS_BATTERY_FULL_HYSTERESIS        95
 #define HS_BATTERY_LOW_CONFIRM            3
 
-static uint8_t  hs_battery_samples[HS_BATTERY_FILTER_SIZE];
-static uint8_t  hs_battery_sample_count;
-static uint8_t  hs_battery_sample_index;
-static uint8_t  hs_battery_filtered = 0xFF;
-static uint8_t  hs_battery_low_confirm;
+static battery_filter_t hs_battery_filter = {.filtered = 0xFF};
+static battery_full_t   hs_battery_full;
+
 static uint32_t hs_battery_last_tick;
 static uint32_t hs_battery_last_filter;
 static uint32_t hs_battery_cable_changed_at;
 static uint32_t hs_battery_full_changed_at;
-static uint32_t hs_battery_full_since;
 static bool     hs_battery_cable_raw;
 static bool     hs_battery_full_raw;
 static bool     hs_battery_full_signal;
-static bool     hs_battery_full_latched;
-
-static uint8_t hs_battery_median(uint8_t *values, uint8_t count) {
-    uint8_t sorted[HS_BATTERY_FILTER_SIZE];
-    memcpy(sorted, values, count);
-    for (uint8_t i = 0; i < count; i++) {
-        for (uint8_t j = (uint8_t)(i + 1); j < count; j++) {
-            if (sorted[j] < sorted[i]) {
-                uint8_t tmp = sorted[i];
-                sorted[i]  = sorted[j];
-                sorted[j]  = tmp;
-            }
-        }
-    }
-    return sorted[count / 2];
-}
 
 uint8_t hs_battery_percent(void) {
-    return hs_battery_filtered;
+    return battery_filter_percent(&hs_battery_filter);
 }
 
 bool hs_battery_low_confirmed(void) {
-    return hs_battery_low_confirm >= HS_BATTERY_LOW_CONFIRM;
+    return battery_low_confirmed(&hs_battery_filter, HS_BATTERY_LOW_CONFIRM);
 }
 
 bool hs_battery_is_full(void) {
-    return charging_state && hs_battery_full_latched;
+    return charging_state && battery_full_latched(&hs_battery_full);
 }
 
 void hs_battery_task(void) {
@@ -89,54 +70,10 @@ void hs_battery_task(void) {
     if (timer_elapsed32(hs_battery_last_filter) >= HS_BATTERY_FILTER_MS) {
         hs_battery_last_filter = now;
         uint8_t raw            = *md_getp_bat();
-        if (raw <= 100) {
-            if (hs_battery_sample_count < HS_BATTERY_FILTER_SIZE) {
-                hs_battery_samples[hs_battery_sample_count++] = raw;
-            } else {
-                hs_battery_samples[hs_battery_sample_index] = raw;
-                hs_battery_sample_index = (uint8_t)((hs_battery_sample_index + 1) % HS_BATTERY_FILTER_SIZE);
-            }
-
-            if (hs_battery_sample_count >= 3) {
-                uint8_t median = hs_battery_median(hs_battery_samples, hs_battery_sample_count);
-                if (hs_battery_filtered == 0xFF) {
-                    hs_battery_filtered = median;
-                } else {
-                    hs_battery_filtered = (uint8_t)(((uint16_t)hs_battery_filtered * 3 + median + 2) / 4);
-                }
-            }
-
-            if (raw <= BATTERY_CAPACITY_STOP) {
-                if (hs_battery_low_confirm < HS_BATTERY_LOW_CONFIRM) {
-                    hs_battery_low_confirm++;
-                }
-            } else {
-                hs_battery_low_confirm = 0;
-            }
-        } else {
-            hs_battery_filtered    = 0xFF;
-            hs_battery_sample_count = 0;
-            hs_battery_sample_index = 0;
-            hs_battery_low_confirm  = 0;
-        }
+        battery_filter_update(&hs_battery_filter, raw, BATTERY_CAPACITY_STOP, HS_BATTERY_LOW_CONFIRM);
     }
 
-    if (!charging_state) {
-        hs_battery_full_latched = false;
-        hs_battery_full_since   = 0;
-    } else if (!hs_battery_full_latched) {
-        if (hs_battery_full_signal && hs_battery_filtered != 0xFF && hs_battery_filtered >= HS_BATTERY_FULL_MIN) {
-            if (!hs_battery_full_since) {
-                hs_battery_full_since = now;
-            } else if (timer_elapsed32(hs_battery_full_since) >= HS_BATTERY_FULL_STABLE_MS) {
-                hs_battery_full_latched = true;
-            }
-        } else {
-            hs_battery_full_since = 0;
-        }
-    } else if (hs_battery_filtered == 0xFF || hs_battery_filtered < HS_BATTERY_FULL_HYSTERESIS) {
-        hs_battery_full_latched = false;
-    }
+    battery_full_update(&hs_battery_full, charging_state, hs_battery_full_signal, battery_filter_percent(&hs_battery_filter), now, HS_BATTERY_FULL_MIN, HS_BATTERY_FULL_HYSTERESIS, HS_BATTERY_FULL_STABLE_MS);
 
-    bat_full_flag = hs_battery_full_latched;
+    bat_full_flag = battery_full_latched(&hs_battery_full);
 }

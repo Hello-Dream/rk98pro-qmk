@@ -16,7 +16,7 @@ use std::sync::mpsc::channel;
 use tauri::{Manager, State, WindowEvent};
 
 use history::HistorySnapshot;
-use monitor::{Action, MonitorState};
+use monitor::{Action, MonitorError, MonitorState};
 use preferences::Preferences;
 use status::Status;
 use wpm::WpmStats;
@@ -24,6 +24,11 @@ use wpm::WpmStats;
 #[tauri::command]
 fn get_status(state: State<'_, MonitorState>) -> Option<Status> {
     state.snapshot()
+}
+
+#[tauri::command]
+fn get_monitor_error(state: State<'_, MonitorState>) -> Option<MonitorError> {
+    state.monitor_error()
 }
 
 #[tauri::command]
@@ -79,6 +84,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             get_status,
+            get_monitor_error,
             refresh,
             get_history,
             get_wpm_stats,
@@ -111,36 +117,40 @@ pub fn run() {
             match event {
                 WindowEvent::Focused(focused) => {
                     if let Some(state) = state {
-                        state.set_window_visible(*focused);
+                        state.set_window_active(*focused);
                         if *focused {
                             let _ = state.send(Action::Refresh);
                         }
                     }
                 }
                 WindowEvent::CloseRequested { api, .. } => {
-                    if window
-                        .app_handle()
-                        .try_state::<tray::TrayState>()
-                        .is_some()
-                    {
+                    if window.app_handle().try_state::<tray::TrayState>().is_some() {
                         api.prevent_close();
                         let _ = window.hide();
                         if let Some(state) = state {
-                            state.set_window_visible(false);
+                            state.set_window_active(false);
                         }
                     }
                 }
                 _ => {}
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                if let Some(state) = app.try_state::<MonitorState>() {
+                    state.flush_history();
+                }
+            }
+        });
 }
 
 #[cfg(test)]
 mod tests {
     const ALLOWED: &[&str] = &[
         "get_status",
+        "get_monitor_error",
         "refresh",
         "get_history",
         "get_wpm_stats",

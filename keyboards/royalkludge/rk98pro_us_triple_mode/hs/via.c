@@ -134,7 +134,6 @@ void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
                 case id_sleep_timeout:
                     if (value_data[0] <= hs_sleep_timeout_vendor) {
                         hs_set_sleep_timeout(value_data[0]);
-                        hs_settings_update();
                     }
                     break;
                 case id_side_light_mode: hs_set_side_light_mode(value_data[0]); break;

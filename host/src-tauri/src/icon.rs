@@ -9,17 +9,8 @@ use crate::status::{Status, CHARGING_CHARGING, CHARGING_FULL};
 const SIZE: usize = 32;
 
 const BOLT: [&str; 11] = [
-    "..##..",
-    ".###..",
-    "####..",
-    "..##..",
-    ".#####",
-    "...##.",
-    "..##..",
-    ".###..",
-    ".##...",
-    ".#....",
-    "#.....",
+    "..##..", ".###..", "####..", "..##..", ".#####", "...##.", "..##..", ".###..", ".##...",
+    ".#....", "#.....",
 ];
 
 fn put(buffer: &mut [u8], x: i32, y: i32, color: [u8; 4]) {
@@ -98,10 +89,7 @@ pub fn battery_icon(status: Option<&Status>) -> Image<'static> {
     fill_rect(&mut pixels, 25, 13, 27, 18, outline);
     fill_rect(&mut pixels, 7, 11, 22, 20, [40, 40, 40, 255]);
 
-    let level = status
-        .and_then(|value| value.battery)
-        .unwrap_or(0)
-        .min(100) as i32;
+    let level = status.and_then(|value| value.battery).unwrap_or(0).min(100) as i32;
     let fill_width = 15 * level / 100;
     if fill_width > 0 {
         fill_rect(&mut pixels, 8, 12, 8 + fill_width, 19, level_color(status));

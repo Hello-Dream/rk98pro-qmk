@@ -42,6 +42,18 @@
       "icons/icon.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "linux": {
+      "deb": {
+        "files": {
+          "/usr/lib/udev/rules.d/99-rk98pro.rules": "../packaging/99-rk98pro.rules"
+        }
+      },
+      "rpm": {
+        "files": {
+          "/usr/lib/udev/rules.d/99-rk98pro.rules": "../packaging/99-rk98pro.rules"
+        }
+      }
+    }
   }
 }

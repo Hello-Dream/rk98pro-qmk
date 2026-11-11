@@ -117,9 +117,13 @@ void hs_set_side_light_mode(uint8_t mode) {
         mode = 0;
     }
 
+    // 同值仍重放硬件，保证唤醒/复位后灯光与设置一致；只跳过持久化。
+    bool changed = hs_settings.side_light_mode != mode;
     hs_rl_apply_mode(mode);
-    hs_settings.side_light_mode = hs_rl_mode;
-    hs_settings_update();
+    if (changed) {
+        hs_settings.side_light_mode = hs_rl_mode;
+        hs_settings_update();
+    }
 }
 
 #ifdef RGB_MATRIX_ENABLE
@@ -170,6 +174,13 @@ void hs_rgbrec_switch_channel(uint8_t channel) {
 
     if (rgbrec_is_started() && hs_settings.rgbrec_channel == channel) {
         return; // 已在该通道录制，不打断当前录制
+    }
+
+    // 未录制且已是当前通道时保留预览，只跳过 EEPROM 持久化。
+    if (!rgbrec_is_started() && hs_settings.rgbrec_channel == channel) {
+        hs_record_last_mode_update();
+        rgbrec_show(channel);
+        return;
     }
 
     hs_record_last_mode_update();

@@ -11,15 +11,25 @@
 
 ## 验证与构建
 
-仓库没有固件单元测试；host 有 Vitest 前端测试和 Rust 单元测试。提交前按 CI 顺序执行：
+仓库有 `tests/firmware` 下的主机侧纯 C 测试；host 有 Vitest 前端测试、Playwright e2e 和 Rust 单元测试。提交前按 CI 顺序执行：
 
 ```bash
 python3 scripts/check_constraints.py --base origin/main --strict
 python3 scripts/validate_via_json.py
 git diff --check origin/main...HEAD -- '*.c' '*.h'
 (cd host && pnpm lint && pnpm typecheck && pnpm test && pnpm build)
+(cd host/src-tauri && cargo fmt -- --check)
+(cd host/src-tauri && cargo clippy --locked --all-targets -- -D warnings)
 cargo test --manifest-path host/src-tauri/Cargo.toml
+cc -std=c11 -Wall -Wextra -Werror \
+  -I keyboards/royalkludge/rk98pro_us_triple_mode/hs \
+  keyboards/royalkludge/rk98pro_us_triple_mode/hs/battery_policy.c \
+  tests/firmware/test_battery_policy.c -o /tmp/test_battery_policy
+/tmp/test_battery_policy
+(cd host && pnpm exec playwright install --with-deps chromium && pnpm test:e2e)
 ```
+
+- 发布 tag 还需运行 `python3 scripts/check_release_tag.py --tag "$GITHUB_REF_NAME"`，校验 tag 为 `v<产品版本>` 或 `v<产品版本>-<prerelease>`；`verify` job 在 tag 构建同样运行，`release` 依赖它。
 
 - `--base` 必须是本地已存在的提交；本地用 `origin/main`，CI 的 push 事件用 `github.event.before`（手动触发时回退 `origin/main`）。基线过旧会产生误报。
 - 本地编译：先在本仓库根目录把 `keyboards/` 叠加到 QMK 树（注意末尾的 `/.`），再在 QMK 根目录执行：
@@ -43,8 +53,9 @@ make royalkludge/rk98pro_us_triple_mode:default:flash
 - `keyboard.json`：硬件与构建配置的单一事实来源，包括 6×19 矩阵、100 颗主键灯、6 层（`dynamic_keymap.layer_count`）、启用的内置灯效、USB VID/PID、10ms 去抖；6 颗侧灯由 `config.h` 的 `RGBLED_NUM` 定义。`features.rgblight=false` 时 `Side Light` 持久模式只保存模式值，充电、连接和低电状态提示仍通过 RGB Matrix 使用这些侧灯。
 - `keymaps/default/keymap.c`：6 层含义：`_BL`/`_FL` 为 Windows 基础/Fn，`_MBL`/`_MFL` 为 macOS 基础/Fn，`_DEFA` 为 Fn+右Shift 刷机层（左上角 `QK_BOOT`），`_MOUSE` 由 Fn+M 切换；增删层要同步 `keyboard.json` 的 `dynamic_keymap.layer_count`。
 - `rk98pro_us_triple_mode.c`：板级初始化、QMK 钩子和模块编排；电源/续航、指示灯、无线、VIA、RGB 录制和 EEPROM 复位主要由 `hs/` 模块实现。主要钩子：`pre_process_record_kb`、`process_record_kb`、`housekeeping_task_user`、`rgb_matrix_indicators_advanced_kb`、`keyboard_post_init_kb`。
-- `hs/status.c/h`：只读状态快照、`seq`、raw HID 事件推送和 VIA `0x22` GET。
+- `hs/status.c/h`：只读状态快照、`seq`、raw HID 事件推送和 VIA `0x22` GET；状态检查按最近 GET 自适应 250ms/1s。
 - `hs/power.c/h`、`hs/battery.c/h`：电源/续航状态机、电量滤波与充满判定。
+- `hs/battery_policy.c/h`：不依赖 QMK 的电池滤波、低电确认与充满锁存纯逻辑；`tests/firmware/test_battery_policy.c` 覆盖其边界。
 - `hs/indicators.c/h`：Caps/Num/Scroll/Win、侧灯状态提示、电量条和连接提示。
 - `hs/keys.c/h`：短按键过滤、`process_record_user` 与按键初始化。
 - `hs/rgb.c/h`：持久侧灯模式（当前只保存模式）、灯效选择与 RGB 录制集成；持久侧灯逻辑用 `#ifdef RGBLIGHT_ENABLE` 隔离，避免覆盖主键灯效。
@@ -72,5 +83,6 @@ make royalkludge/rk98pro_us_triple_mode:default:flash
 - 发版时同步产品版本：`keyboard.json` 的 `version`、`config.h` 的 `HS_FIRMWARE_VERSION_*`、`host/package.json`、`host/src-tauri/Cargo.toml`，以及 `CHANGELOG.md`、`README.md` 和 `RELEASE_NOTES.md`；`scripts/check_constraints.py` 会校验这些版本一致。
 - `HS_SETTINGS_VERSION` 和 `HS_STATUS_SNAPSHOT_VERSION` 是兼容性版本，不随产品版本递增；前者只在 EEPROM 布局变化时递增，后者只在状态快照字段或事件格式变化时递增。
 - 发布产物是 `royalkludge_rk98pro_us_triple_mode_default.bin` 和 `rk98pro_us_triple_mode.json`，以及 Windows / Linux 的 x64、ARM64 上位机安装包；推送 `v*` tag 会触发 Release，正文取自 `RELEASE_NOTES.md`。普通 push 只跑校验、测试和固件编译，不生成桌面安装包。
+- Linux deb/rpm 安装包必须包含 `/usr/lib/udev/rules.d/99-rk98pro.rules`；`tauri.conf.json` 的 `bundle.linux.deb.files` / `rpm.files` 负责映射，CI 用 `dpkg-deb -c` 和 `rpm -qpl` 校验。
 - `*.bin`、`*.hex`、`*.uf2`、`*.elf` 已被 `.gitignore` 忽略；根目录同名产物是本地文件，不要提交。
 - 用户可见的快捷键或行为变化需同步 `README.md` 与 `快捷键说明.md`；文档和代码注释保持中文。

@@ -14,6 +14,7 @@ describe('Tauri API 包装', () => {
   it('只暴露只读状态和本机操作', () => {
     expect(Object.keys(api).sort()).toEqual([
       'getHistory',
+      'getMonitorError',
       'getPreferences',
       'getStatus',
       'getWpmStats',
@@ -27,6 +28,11 @@ describe('Tauri API 包装', () => {
   it('读取状态快照', async () => {
     await api.getStatus();
     expect(invoke).toHaveBeenCalledWith('get_status');
+  });
+
+  it('读取只读诊断信息', async () => {
+    await api.getMonitorError();
+    expect(invoke).toHaveBeenCalledWith('get_monitor_error');
   });
 
   it('读取 WPM 统计', async () => {

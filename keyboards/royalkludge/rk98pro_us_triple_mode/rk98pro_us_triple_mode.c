@@ -54,6 +54,9 @@ bool hs_keymap_is_mac(void) {
 
 // 此函数不需要改动
 void mm_set_rgb_enable(bool state) {
+    if ((hs_settings.rgb_enabled != 0) == state) {
+        return; // 同值不重复标记 dirty
+    }
     hs_settings.rgb_enabled = state;
     hs_settings_update();
 }
@@ -630,8 +633,8 @@ void housekeeping_task_user(void) { // loop
     }
 
     hs_store_task();
-    hs_battery_task();
     hs_status_task();
+    // hs_send_bat_status() 内部已调用 hs_battery_task()，这里不再重复采样
     hs_send_bat_status();
     hs_bat_indicators_task();
     hs_power_task();

@@ -13,17 +13,63 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_notification::NotificationExt;
 
 use crate::device::{find_monitor_device, ViaDevice};
+use crate::error::ViaError;
 use crate::history::{HistorySnapshot, HistoryStore};
 use crate::preferences::{PreferenceStore, Preferences};
-use crate::status::{Status, CHARGING_CHARGING, CHARGING_DISCHARGING, CHARGING_FULL, FULL_BATTERY_MIN};
+use crate::status::{
+    Status, CHARGING_CHARGING, CHARGING_DISCHARGING, CHARGING_FULL, FULL_BATTERY_MIN,
+};
 use crate::storage::now_epoch;
 use crate::tray;
 use crate::wpm::{WpmStats, WpmTracker};
 
 const EVENT_MAGIC: u8 = 0xE0;
 const EVENT_STATUS: u8 = 0x01;
-const VISIBLE_POLL: Duration = Duration::from_secs(1);
+const ACTIVE_POLL: Duration = Duration::from_secs(1);
 const TRAY_POLL: Duration = Duration::from_secs(30);
+const ACTIVE_WAIT: Duration = Duration::from_millis(200);
+const TRAY_WAIT: Duration = Duration::from_secs(1);
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MonitorError {
+    pub kind: String,
+    pub message: String,
+}
+
+impl MonitorError {
+    /// 把底层 HID/协议错误转换为可操作的界面提示。
+    fn from_via(error: &ViaError) -> Self {
+        match error {
+            ViaError::Unsupported(value) => Self {
+                kind: "unsupported".to_string(),
+                message: format!(
+                    "固件不支持只读状态通道 0x{value:02X}，请更新固件后再连接。"
+                ),
+            },
+            ViaError::Protocol(message) => Self {
+                kind: "unsupported".to_string(),
+                message: format!("固件状态协议不兼容：{message}。请更新固件。"),
+            },
+            ViaError::AccessDenied(detail) => Self {
+                kind: "access_denied".to_string(),
+                message: format!(
+                    "无法访问键盘 HID 接口（权限不足）。请安装或检查 udev 规则，运行 `sudo udevadm control --reload-rules` 后重新插拔设备。详情：{detail}"
+                ),
+            },
+            ViaError::NoDevice(detail) => Self {
+                kind: "not_found".to_string(),
+                message: format!(
+                    "未找到键盘的只读 HID 接口。请使用 USB 有线或 2.4G 接收器；蓝牙模式不提供 raw HID。详情：{detail}"
+                ),
+            },
+            ViaError::Hid(detail) | ViaError::Timeout(detail) => Self {
+                kind: "hid".to_string(),
+                message: format!("HID 访问异常：{detail}。请重新插拔键盘或接收器。"),
+            },
+        }
+    }
+}
 
 #[derive(Debug)]
 pub enum Action {
@@ -35,7 +81,8 @@ pub struct MonitorState {
     pub history: Mutex<HistoryStore>,
     pub preferences: Mutex<PreferenceStore>,
     wpm: Mutex<WpmTracker>,
-    window_visible: AtomicBool,
+    window_active: AtomicBool,
+    last_error: Mutex<Option<MonitorError>>,
     tx: Mutex<Sender<Action>>,
 }
 
@@ -46,7 +93,8 @@ impl MonitorState {
             history: Mutex::new(HistoryStore::load(data_dir.join("history.json"))),
             preferences: Mutex::new(PreferenceStore::load(data_dir.join("preferences.json"))),
             wpm: Mutex::new(WpmTracker::new()),
-            window_visible: AtomicBool::new(true),
+            window_active: AtomicBool::new(true),
+            last_error: Mutex::new(None),
             tx: Mutex::new(tx),
         }
     }
@@ -92,12 +140,41 @@ impl MonitorState {
             .map_err(|_| "重置 WPM 统计失败".to_string())
     }
 
-    pub fn set_window_visible(&self, visible: bool) {
-        self.window_visible.store(visible, Ordering::SeqCst);
+    pub fn set_window_active(&self, active: bool) {
+        self.window_active.store(active, Ordering::SeqCst);
     }
 
-    pub fn window_visible(&self) -> bool {
-        self.window_visible.load(Ordering::SeqCst)
+    pub fn window_active(&self) -> bool {
+        self.window_active.load(Ordering::SeqCst)
+    }
+
+    pub fn monitor_error(&self) -> Option<MonitorError> {
+        self.last_error.lock().ok().and_then(|error| error.clone())
+    }
+
+    /// 写入诊断错误；相同内容不重复触发事件，瞬时 HID 错误不覆盖旧固件/权限错误。
+    /// 返回是否需要向界面推送 `monitor-error`。
+    pub fn set_monitor_error(&self, error: Option<MonitorError>) -> bool {
+        let Ok(mut current) = self.last_error.lock() else {
+            return false;
+        };
+        if let (Some(next), Some(previous)) = (error.as_ref(), current.as_ref()) {
+            let protected = matches!(previous.kind.as_str(), "unsupported" | "access_denied");
+            if next.kind == "hid" && protected {
+                return false;
+            }
+        }
+        if *current == error {
+            return false;
+        }
+        *current = error;
+        true
+    }
+
+    pub fn flush_history(&self) {
+        if let Ok(mut history) = self.history.lock() {
+            history.flush(now_epoch());
+        }
     }
 
     pub fn send(&self, action: Action) -> Result<(), String> {
@@ -185,7 +262,9 @@ impl StatusTracker {
     }
 
     fn handle_charging(&mut self, status: &Status, events: &mut Vec<AppNotification>) {
-        let battery_full = status.battery.is_some_and(|battery| battery >= FULL_BATTERY_MIN);
+        let battery_full = status
+            .battery
+            .is_some_and(|battery| battery >= FULL_BATTERY_MIN);
         if status.charging == CHARGING_FULL
             && battery_full
             && self.last_charging.is_some()
@@ -264,6 +343,24 @@ enum StatusSource {
     Event,
 }
 
+fn poll_interval(window_active: bool) -> Duration {
+    if window_active {
+        ACTIVE_POLL
+    } else {
+        TRAY_POLL
+    }
+}
+
+/// 主循环单次等待上限：聚焦 200ms、失焦/托盘 1s；刷新请求仍会立即打断等待。
+fn wait_limit(window_active: bool, next_poll: Instant, now: Instant) -> Duration {
+    let limit = if window_active {
+        ACTIVE_WAIT
+    } else {
+        TRAY_WAIT
+    };
+    next_poll.saturating_duration_since(now).min(limit)
+}
+
 fn should_apply_event(last_seq: Option<u8>, seq: u8) -> bool {
     match last_seq {
         None => true,
@@ -283,12 +380,15 @@ fn run_loop(app: AppHandle, rx: Receiver<Action>) {
     let mut last_seq: Option<u8> = None;
 
     loop {
+        flush_history_if_due(&app);
+
         let now = Instant::now();
         if now >= next_poll {
-            let interval = app
+            let window_active = app
                 .try_state::<MonitorState>()
-                .map(|state| if state.window_visible() { VISIBLE_POLL } else { TRAY_POLL })
-                .unwrap_or(VISIBLE_POLL);
+                .map(|state| state.window_active())
+                .unwrap_or(true);
+            let interval = poll_interval(window_active);
 
             if device.is_none() {
                 match find_monitor_device(true, 800) {
@@ -298,6 +398,7 @@ fn run_loop(app: AppHandle, rx: Receiver<Action>) {
                     }
                     Err(error) => {
                         log::debug!("连接 RK98PRO 失败：{error}");
+                        publish_monitor_error(&app, Some(MonitorError::from_via(&error)));
                         handle_offline(&app, &mut tracker, &mut last_had_status);
                         next_poll = now + backoff;
                         backoff = (backoff * 2).min(Duration::from_secs(10));
@@ -309,12 +410,20 @@ fn run_loop(app: AppHandle, rx: Receiver<Action>) {
             let result = device.as_ref().map(|handle| handle.get_status());
             match result {
                 Some(Ok(status)) => {
-                    apply_status(&app, &mut tracker, status, StatusSource::Poll, &mut last_seq);
+                    publish_monitor_error(&app, None);
+                    apply_status(
+                        &app,
+                        &mut tracker,
+                        status,
+                        StatusSource::Poll,
+                        &mut last_seq,
+                    );
                     last_had_status = true;
                     next_poll = now + interval;
                 }
                 Some(Err(error)) => {
                     log::warn!("读取 RK98PRO 状态失败：{error}");
+                    publish_monitor_error(&app, Some(MonitorError::from_via(&error)));
                     device = None;
                     handle_offline(&app, &mut tracker, &mut last_had_status);
                     last_had_status = false;
@@ -352,9 +461,13 @@ fn run_loop(app: AppHandle, rx: Receiver<Action>) {
             next_poll = Instant::now();
         }
 
-        let wait = next_poll
-            .saturating_duration_since(Instant::now())
-            .min(Duration::from_millis(100));
+        let wait = wait_limit(
+            app.try_state::<MonitorState>()
+                .map(|state| state.window_active())
+                .unwrap_or(true),
+            next_poll,
+            Instant::now(),
+        );
         match rx.recv_timeout(wait) {
             Ok(Action::Refresh) => {
                 next_poll = Instant::now();
@@ -407,6 +520,22 @@ fn handle_offline(app: &AppHandle, tracker: &mut StatusTracker, last_had_status:
 
 fn history_event_needed(sample_appended: bool, event_appended: bool) -> bool {
     sample_appended || event_appended
+}
+
+fn flush_history_if_due(app: &AppHandle) {
+    if let Some(state) = app.try_state::<MonitorState>() {
+        if let Ok(mut history) = state.history.lock() {
+            history.flush_if_due(now_epoch());
+        }
+    }
+}
+
+fn publish_monitor_error(app: &AppHandle, error: Option<MonitorError>) {
+    if let Some(state) = app.try_state::<MonitorState>() {
+        if state.set_monitor_error(error.clone()) {
+            let _ = app.emit("monitor-error", error);
+        }
+    }
 }
 
 fn emit_history_updated(app: &AppHandle) {
@@ -513,55 +642,37 @@ mod tests {
 
         assert_eq!(
             tracker
-                .update(
-                    Some(&status(18, CHARGING_DISCHARGING, LINK_CONNECTED)),
-                    now
-                )
+                .update(Some(&status(18, CHARGING_DISCHARGING, LINK_CONNECTED)), now)
                 .len(),
             1
         );
         assert_eq!(
             tracker
-                .update(
-                    Some(&status(17, CHARGING_DISCHARGING, LINK_CONNECTED)),
-                    now
-                )
+                .update(Some(&status(17, CHARGING_DISCHARGING, LINK_CONNECTED)), now)
                 .len(),
             0
         );
         assert_eq!(
             tracker
-                .update(
-                    Some(&status(14, CHARGING_DISCHARGING, LINK_CONNECTED)),
-                    now
-                )
+                .update(Some(&status(14, CHARGING_DISCHARGING, LINK_CONNECTED)), now)
                 .len(),
             1
         );
         assert_eq!(
             tracker
-                .update(
-                    Some(&status(9, CHARGING_DISCHARGING, LINK_CONNECTED)),
-                    now
-                )
+                .update(Some(&status(9, CHARGING_DISCHARGING, LINK_CONNECTED)), now)
                 .len(),
             1
         );
         assert_eq!(
             tracker
-                .update(
-                    Some(&status(4, CHARGING_DISCHARGING, LINK_CONNECTED)),
-                    now
-                )
+                .update(Some(&status(4, CHARGING_DISCHARGING, LINK_CONNECTED)), now)
                 .len(),
             1
         );
         assert_eq!(
             tracker
-                .update(
-                    Some(&status(4, CHARGING_DISCHARGING, LINK_CONNECTED)),
-                    now
-                )
+                .update(Some(&status(4, CHARGING_DISCHARGING, LINK_CONNECTED)), now)
                 .len(),
             0
         );
@@ -574,28 +685,19 @@ mod tests {
 
         assert_eq!(
             tracker
-                .update(
-                    Some(&status(10, CHARGING_DISCHARGING, LINK_CONNECTED)),
-                    now
-                )
+                .update(Some(&status(10, CHARGING_DISCHARGING, LINK_CONNECTED)), now)
                 .len(),
             1
         );
         assert_eq!(
             tracker
-                .update(
-                    Some(&status(10, CHARGING_CHARGING, LINK_CONNECTED)),
-                    now
-                )
+                .update(Some(&status(10, CHARGING_CHARGING, LINK_CONNECTED)), now)
                 .len(),
             0
         );
         assert_eq!(
             tracker
-                .update(
-                    Some(&status(10, CHARGING_DISCHARGING, LINK_CONNECTED)),
-                    now
-                )
+                .update(Some(&status(10, CHARGING_DISCHARGING, LINK_CONNECTED)), now)
                 .len(),
             1
         );
@@ -608,10 +710,7 @@ mod tests {
 
         assert_eq!(
             tracker
-                .update(
-                    Some(&status(90, CHARGING_CHARGING, LINK_CONNECTED)),
-                    now
-                )
+                .update(Some(&status(90, CHARGING_CHARGING, LINK_CONNECTED)), now)
                 .len(),
             0
         );
@@ -644,6 +743,53 @@ mod tests {
     }
 
     #[test]
+    fn poll_interval_is_focused_or_tray() {
+        assert_eq!(poll_interval(true), Duration::from_secs(1));
+        assert_eq!(poll_interval(false), Duration::from_secs(30));
+    }
+
+    #[test]
+    fn wait_limit_uses_focus_aware_cap() {
+        let now = Instant::now();
+        assert_eq!(
+            wait_limit(true, now + Duration::from_secs(1), now),
+            Duration::from_millis(200)
+        );
+        assert_eq!(
+            wait_limit(false, now + Duration::from_secs(30), now),
+            Duration::from_secs(1)
+        );
+        assert_eq!(
+            wait_limit(false, now + Duration::from_millis(50), now),
+            Duration::from_millis(50)
+        );
+    }
+
+    #[test]
+    fn monitor_error_deduplicates_and_protects_protocol_errors() {
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let state = MonitorState::new(tx, std::env::temp_dir().join("rk98pro-monitor-error-test"));
+
+        let protocol = MonitorError {
+            kind: "unsupported".to_string(),
+            message: "旧固件".to_string(),
+        };
+        assert!(state.set_monitor_error(Some(protocol.clone())));
+        assert!(!state.set_monitor_error(Some(protocol.clone())));
+
+        let transient = MonitorError {
+            kind: "hid".to_string(),
+            message: "超时".to_string(),
+        };
+        assert!(!state.set_monitor_error(Some(transient)));
+        assert_eq!(state.monitor_error(), Some(protocol));
+
+        assert!(state.set_monitor_error(None));
+        assert!(!state.set_monitor_error(None));
+        assert_eq!(state.monitor_error(), None);
+    }
+
+    #[test]
     fn disconnect_after_grace_and_reconnect() {
         let mut tracker = StatusTracker::new();
         let start = Instant::now();
@@ -659,7 +805,10 @@ mod tests {
         );
         assert_eq!(
             tracker
-                .update(Some(&status(80, CHARGING_DISCHARGING, 3)), start + Duration::from_secs(5))
+                .update(
+                    Some(&status(80, CHARGING_DISCHARGING, 3)),
+                    start + Duration::from_secs(5)
+                )
                 .len(),
             0
         );
