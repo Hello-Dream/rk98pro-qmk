@@ -123,13 +123,13 @@ pub fn run() {
                         }
                     }
                 }
-                WindowEvent::CloseRequested { api, .. } => {
-                    if window.app_handle().try_state::<tray::TrayState>().is_some() {
-                        api.prevent_close();
-                        let _ = window.hide();
-                        if let Some(state) = state {
-                            state.set_window_active(false);
-                        }
+                WindowEvent::CloseRequested { api, .. }
+                    if window.app_handle().try_state::<tray::TrayState>().is_some() =>
+                {
+                    api.prevent_close();
+                    let _ = window.hide();
+                    if let Some(state) = state {
+                        state.set_window_active(false);
                     }
                 }
                 _ => {}

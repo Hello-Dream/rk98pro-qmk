@@ -240,7 +240,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rule="/usr/lib/udev/rules.d/99-rk98pro.rules"
+          rule="usr/lib/udev/rules.d/99-rk98pro.rules"
 
           deb="$(find "${{ matrix.target_dir }}/release/bundle/deb" -name '*.deb' -print -quit)"
           test -n "$deb"
@@ -253,7 +253,7 @@ jobs:
             sudo apt-get install -y rpm
           fi
           rpm -qpl "$rpm_file" | grep -Fq "$rule"
-          echo "deb/rpm 均包含 $rule"
+          echo "deb/rpm 均包含 /$rule"
 
       - name: Prepare Windows setup
         if: runner.os == 'Windows'
