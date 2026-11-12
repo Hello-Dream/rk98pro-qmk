@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Manager};
 
+use super::publisher;
 use super::tracker::StatusTracker;
 use super::{Action, MonitorError, MonitorState};
 use crate::device::{find_monitor_device, ViaDevice};
@@ -66,7 +67,7 @@ fn run_loop(app: AppHandle, rx: Receiver<Action>) {
     let mut last_seq: Option<u8> = None;
 
     loop {
-        super::publisher::flush_history_if_due(&app);
+        publisher::flush_history_if_due(&app);
 
         let now = Instant::now();
         if now >= next_poll {
@@ -84,7 +85,7 @@ fn run_loop(app: AppHandle, rx: Receiver<Action>) {
                     }
                     Err(error) => {
                         log::debug!("连接 RK98PRO 失败：{error}");
-                        super::publisher::publish_monitor_error(
+                        publisher::publish_monitor_error(
                             &app,
                             Some(MonitorError::from_via(&error)),
                         );
@@ -99,7 +100,7 @@ fn run_loop(app: AppHandle, rx: Receiver<Action>) {
             let result = device.as_ref().map(|handle| handle.get_status());
             match result {
                 Some(Ok(status)) => {
-                    super::publisher::publish_monitor_error(&app, None);
+                    publisher::publish_monitor_error(&app, None);
                     apply_status(
                         &app,
                         &mut tracker,
@@ -112,10 +113,7 @@ fn run_loop(app: AppHandle, rx: Receiver<Action>) {
                 }
                 Some(Err(error)) => {
                     log::warn!("读取 RK98PRO 状态失败：{error}");
-                    super::publisher::publish_monitor_error(
-                        &app,
-                        Some(MonitorError::from_via(&error)),
-                    );
+                    publisher::publish_monitor_error(&app, Some(MonitorError::from_via(&error)));
                     device = None;
                     handle_offline(&app, &mut tracker, &mut last_had_status);
                     last_had_status = false;
@@ -182,31 +180,31 @@ fn apply_status(
     }
     *last_seq = Some(status.seq);
 
-    super::publisher::publish_status(app, Some(status.clone()));
-    let sample_appended = super::publisher::record_status(app, Some(&status));
-    super::publisher::record_wpm(app, &status);
+    publisher::publish_status(app, Some(status.clone()));
+    let sample_appended = publisher::record_status(app, Some(&status));
+    publisher::record_wpm(app, &status);
     let events = tracker.update(Some(&status), Instant::now());
-    let event_appended = super::publisher::notify_all(app, &events);
-    if super::publisher::history_event_needed(sample_appended, event_appended) {
-        super::publisher::emit_history_updated(app);
+    let event_appended = publisher::notify_all(app, &events);
+    if publisher::history_event_needed(sample_appended, event_appended) {
+        publisher::emit_history_updated(app);
     }
 }
 
 fn handle_offline(app: &AppHandle, tracker: &mut StatusTracker, last_had_status: &mut bool) {
     let events = tracker.update(None, Instant::now());
-    let event_appended = super::publisher::notify_all(app, &events);
-    let sample_appended = super::publisher::record_status(app, None);
+    let event_appended = publisher::notify_all(app, &events);
+    let sample_appended = publisher::record_status(app, None);
     if let Some(state) = app.try_state::<MonitorState>() {
         if let Ok(mut wpm) = state.wpm.lock() {
             wpm.mark_offline();
         }
     }
     if *last_had_status {
-        super::publisher::publish_status(app, None);
+        publisher::publish_status(app, None);
         *last_had_status = false;
     }
-    if super::publisher::history_event_needed(sample_appended, event_appended) {
-        super::publisher::emit_history_updated(app);
+    if publisher::history_event_needed(sample_appended, event_appended) {
+        publisher::emit_history_updated(app);
     }
 }
 

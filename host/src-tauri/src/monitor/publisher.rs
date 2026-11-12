@@ -6,7 +6,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_notification::NotificationExt;
 
 use super::tracker::AppNotification;
-use super::MonitorState;
+use super::{MonitorError, MonitorState};
 use crate::status::Status;
 use crate::storage::now_epoch;
 use crate::tray;
@@ -23,7 +23,7 @@ pub(super) fn flush_history_if_due(app: &AppHandle) {
     }
 }
 
-pub(super) fn publish_monitor_error(app: &AppHandle, error: Option<super::MonitorError>) {
+pub(super) fn publish_monitor_error(app: &AppHandle, error: Option<MonitorError>) {
     if let Some(state) = app.try_state::<MonitorState>() {
         if state.set_monitor_error(error.clone()) {
             let _ = app.emit("monitor-error", error);
