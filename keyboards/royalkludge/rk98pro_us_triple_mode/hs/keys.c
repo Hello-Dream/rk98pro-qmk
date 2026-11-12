@@ -6,11 +6,10 @@
 #include "hs/wireless_glue.h"
 #include "hs/store.h"
 #include "hs/layers.h"
+#include "hs/rgb.h"
 #include "rgb_matrix_blink.h"
 
 #include "rgb_record/rgb_record.h"
-
-extern bool no_record_fg;
 
 /* 短按键过滤（防连击）：某个物理键松开后的 HS_SKF_LOCKOUT_MS 内忽略该键再次按下；
  * 被忽略的那次按下，其对应的“松开”也会一并吞掉，避免向动作系统发出孤儿松开。

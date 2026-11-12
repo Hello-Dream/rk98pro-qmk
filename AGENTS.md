@@ -57,15 +57,20 @@ make royalkludge/rk98pro_us_triple_mode:default:flash
 
 - `keyboard.json`：硬件与构建配置的单一事实来源，包括 6×19 矩阵、100 颗主键灯、6 层（`dynamic_keymap.layer_count`）、启用的内置灯效、USB VID/PID、10ms 去抖；6 颗侧灯由 `config.h` 的 `RGBLED_NUM` 定义。`features.rgblight=false` 时 `Side Light` 持久模式只保存模式值，充电、连接和低电状态提示仍通过 RGB Matrix 使用这些侧灯。
 - `keymaps/default/keymap.c`：6 层含义：`_BL`/`_FL` 为 Windows 基础/Fn，`_MBL`/`_MFL` 为 macOS 基础/Fn，`_DEFA` 为 Fn+右Shift 刷机层（左上角 `QK_BOOT`），`_MOUSE` 由 Fn+M 切换；增删层要同步 `keyboard.json` 的 `dynamic_keymap.layer_count`。
-- `rk98pro_us_triple_mode.c`：板级初始化、QMK 钩子和模块编排；电源/续航、指示灯、无线、VIA、RGB 录制和 EEPROM 复位主要由 `hs/` 模块实现。主要钩子：`pre_process_record_kb`、`process_record_kb`、`housekeeping_task_user`、`rgb_matrix_indicators_advanced_kb`、`keyboard_post_init_kb`。
+- `rk98pro_us_triple_mode.c`：只保留 QMK hook 接线；板级初始化见 `hs/board_init.c/h`，主循环与渲染编排见 `hs/runtime.c/h`。主要钩子：`process_record_kb`、`housekeeping_task_user`、`rgb_matrix_indicators_advanced_kb`、`keyboard_post_init_kb`、`usb_power_connect/disconnect`、`suspend_power_down_kb`/`suspend_wakeup_init_kb`、`lpwr_is_allow_timeout_hook`。
+- `hs/board_init.c/h`：GPIO/引脚初始化，以及无线、录制、侧灯、按键与灯效的启动编排。
+- `hs/settings.c/h`：设置读写、RGB 总开关、Mac 层判断、设置初始化/复位。
+- `hs/session.c/h`：EE_CLR 计时与复位、USB 连接、挂起/唤醒、允许休眠判断。
+- `hs/key_handlers.c/h`：`process_record_kb` 的按键 switch、`start_hsv` 与按键处理器初始化。
+- `hs/runtime.c/h`：`housekeeping_task_user` 编排与 `rgb_matrix_indicators_advanced_kb` 渲染钩子。
 - `hs/status.c/h`：只读状态快照、`seq`、raw HID 事件推送和 VIA `0x22` GET；状态检查按最近 GET 自适应 250ms/1s。
-- `hs/power.c/h`、`hs/battery.c/h`：电源/续航状态机、电量滤波与充满判定。
+- `hs/power.c/h`、`hs/power_config.c`、`hs/power_report.c`、`hs/power_internal.h`、`hs/battery.c/h`：电源/续航状态机、VIA 配置与睡眠超时、无线上报、电量滤波与充满判定。
 - `hs/battery_policy.c/h`：不依赖 QMK 的电池滤波、低电确认与充满锁存纯逻辑；`tests/firmware/test_battery_policy.c` 覆盖其边界。
 - `hs/power_policy.c/h`：不依赖 QMK 的调光/关灯档位、低电状态机与充电提示纯逻辑；`tests/firmware/test_power_policy.c` 覆盖其边界。
 - `hs/indicators.c/h`：Caps/Num/Scroll/Win、侧灯状态提示、电量条和连接提示。
-- `hs/keys.c/h`：短按键过滤、`process_record_user` 与按键初始化。
-- `hs/rgb.c/h`：持久侧灯模式（当前只保存模式）、灯效选择与 RGB 录制集成；持久侧灯逻辑用 `#ifdef RGBLIGHT_ENABLE` 隔离，避免覆盖主键灯效。
-- `hs/wireless.c` + `hs/wireless_glue.h`：无线模式、配对、指示灯和休眠胶水。
+- `hs/keys.c/h`：短按键过滤（`pre_process_record_kb`）、`process_record_user` 与按键初始化。
+- `hs/rgb.c/h`：持久侧灯模式（当前只保存模式）、灯效选择、RGB 录制集成与 `no_record_fg` 共享标记；持久侧灯逻辑用 `#ifdef RGBLIGHT_ENABLE` 隔离，避免覆盖主键灯效。
+- `hs/wireless.c` + `hs/wireless_glue.h` + `hs/wireless_internal.h`：无线 base glue（`post_init_timer`/`state`/`linker_ok`、`wireless_post_task`）；`wireless_mode.c` 模式检测/扫描，`wireless_blink.c` 闪烁与睡眠节拍，`wireless_keys.c` 长按配对与 `process_record_wls`，`wireless_sleep.c` `lpwr_*` 钩子与 `hs_set_sleep_state`，`wireless_indicator.c` WLS/连接指示灯。
 - `hs/via.c/h`、`hs/store.c/h`、`hs/layers.h`：VIA 分发、设置/录制存储和图层定义。
 - `rgb_record/`：按键 RGB 录制与 `RGBR_PLAY` 预览；共 4 个通道，默认快捷键只使用前 3 个，第 4 个为预留。
 - `rgb_matrix_user.inc`：`HS_*` 自定义灯效实现；实际生效顺序会影响已保存的灯效编号。键位和 `keyboard.json` 使用 `EF_*` 键码，C 实现使用 `HS_*`，不要混用。

@@ -8,6 +8,7 @@
 
 extern uint8_t hs_rl_mode;
 extern uint8_t buff[11];
+extern bool    no_record_fg;
 
 void hs_settings_apply_boot(void);
 void im_rgblight_increase(void);

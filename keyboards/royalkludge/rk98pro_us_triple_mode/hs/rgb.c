@@ -12,7 +12,7 @@
 
 uint8_t buff[11] = {2, 3, 4, 5, 6, 7, 8, 1, 1, 1, 0};
 uint8_t hs_rl_mode = 0;
-extern bool no_record_fg;
+bool    no_record_fg;
 
 // 应用侧灯模式：索引对应 buff[]，10 为关闭
 static void hs_rl_apply_mode_internal(uint8_t mode, bool persist) {
