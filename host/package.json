@@ -1,7 +1,7 @@
 {
   "name": "rk98pro-monitor",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "RK98PRO read-only battery, status, WPM and notification monitor",
   "license": "GPL-2.0-or-later",
   "type": "module",

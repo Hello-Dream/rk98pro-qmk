@@ -1,4 +1,4 @@
-# RK98PRO Monitor v1.0.2
+# RK98PRO Monitor v1.0.3
 
 RK98PRO 的只读桌面监控。上位机只显示电量、键盘功能状态和本机通知，不写键盘；键位、灯效、侧灯模式、电源和 RGB 录制仍由 VIA 配置。`Side Light` 持久模式当前只保存模式值，不驱动持久灯光；充电、连接和低电状态提示仍由固件通过 RGB Matrix 使用侧灯。
 
@@ -118,7 +118,7 @@ GET 响应的 `value_data[3..]` 和事件 payload 使用同一份 23 字节快�
 ```text
 [0]  version             快照协议版本，当前 1（上位机只接受 1）
 [1]  seq                 状态变化序号
-[2]  fw_major            固件发布版本主版本（与 keyboard.json version 一致，当前 1.0.2）
+[2]  fw_major            固件发布版本主版本（与 keyboard.json version 一致，当前 1.0.3）
 [3]  fw_minor            固件发布版本次版本
 [4]  fw_patch            固件发布版本修订号
 [5]  settings_version    HS_SETTINGS_VERSION（EEPROM 设置布局版本，当前 1）

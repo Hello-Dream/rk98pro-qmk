@@ -2,7 +2,7 @@
 
 Royal Kludge **RK98PRO**（QMK 路径 `royalkludge/rk98pro_us_triple_mode`）的 QMK 固件、VIA 定义与只读桌面监控。
 
-本仓库以 overlay 形式提供键盘固件：需要叠加到官方 `qmk/qmk_firmware` 的固定提交后编译，不包含完整 QMK 源码树。当前稳定版本 **v1.0.2**（产品版本 `1.0.2`），是 v1.0.1 的运行时、Linux 交付与诊断优化版本；固件、VIA 定义与上位机版本号一致。
+本仓库以 overlay 形式提供键盘固件：需要叠加到官方 `qmk/qmk_firmware` 的固定提交后编译，不包含完整 QMK 源码树。当前稳定版本 **v1.0.3**（产品版本 `1.0.3`），是 v1.0.2 的固件模块拆分与内部结构调整版本，行为、EEPROM 布局和协议均不变；固件、VIA 定义与上位机版本号一致。
 
 ## 特性
 
@@ -28,7 +28,7 @@ Royal Kludge **RK98PRO**（QMK 路径 `royalkludge/rk98pro_us_triple_mode`）的
 
 | 名称 | 当前值 | 递增条件 | 维护位置 |
 | --- | --- | --- | --- |
-| 产品发布版本 | `1.0.2` | 每次发布 | `keyboard.json`、`HS_FIRMWARE_VERSION_*`、上位机 `package.json` / `Cargo.toml`、git tag |
+| 产品发布版本 | `1.0.3` | 每次发布 | `keyboard.json`、`HS_FIRMWARE_VERSION_*`、上位机 `package.json` / `Cargo.toml`、git tag |
 | EEPROM 设置版本 | `1` | 设置块、RGB 录制或侧灯 HSV 布局变化 | `HS_SETTINGS_VERSION` |
 | 状态快照版本 | `1` | 状态快照字段或事件格式变化 | `HS_STATUS_SNAPSHOT_VERSION` |
 
@@ -38,9 +38,9 @@ Royal Kludge **RK98PRO**（QMK 路径 `royalkludge/rk98pro_us_triple_mode`）的
 
 ## 下载
 
-当前稳定版：**[v1.0.2](https://github.com/Hello-Dream/rk98pro-qmk/releases/tag/v1.0.2)**
+当前稳定版：**[v1.0.3](https://github.com/Hello-Dream/rk98pro-qmk/releases/tag/v1.0.3)**
 
-上一稳定版：[v1.0.1](https://github.com/Hello-Dream/rk98pro-qmk/releases/tag/v1.0.1)
+上一稳定版：[v1.0.2](https://github.com/Hello-Dream/rk98pro-qmk/releases/tag/v1.0.2)
 
 | 文件 | 用途 |
 | --- | --- |
@@ -207,7 +207,7 @@ sudo udevadm trigger
 
 规则文件位于 `host/packaging/99-rk98pro.rules`，匹配 VID `342d`、PID `e451`。若上位机提示无法访问 HID 接口，先确认规则已安装并重新插拔；仍失败时检查是否有其他 VIA/监控程序占用该接口。
 
-v1.0.2 固件与上位机使用只读状态通道 `0x22` 和 raw HID 事件推送，上位机只发送 GET，不写键盘。`HS_FIRMWARE_VERSION_*` 与 `keyboard.json` 的 `version` 同步，上位机显示发布版本；`HS_SETTINGS_VERSION` 是 EEPROM 布局版本，与发布版本无关。首次刷入会初始化自定义设置、RGB 录制和动态键位；VIA 自定义 ID `0x10`–`0x21` 与 `rk98pro_us_triple_mode.json` 配合使用。协议说明见 [host/README.md](host/README.md)。
+v1.0.3 固件与上位机使用只读状态通道 `0x22` 和 raw HID 事件推送，上位机只发送 GET，不写键盘。`HS_FIRMWARE_VERSION_*` 与 `keyboard.json` 的 `version` 同步，上位机显示发布版本；`HS_SETTINGS_VERSION` 是 EEPROM 布局版本，与发布版本无关。首次刷入会初始化自定义设置、RGB 录制和动态键位；VIA 自定义 ID `0x10`–`0x21` 与 `rk98pro_us_triple_mode.json` 配合使用。协议说明见 [host/README.md](host/README.md)。
 
 ## 自定义灯效
 

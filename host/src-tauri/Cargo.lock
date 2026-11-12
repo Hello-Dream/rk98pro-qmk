@@ -2914,7 +2914,7 @@ dependencies = [
 
 [[package]]
 name = "rk98pro-monitor"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "env_logger",
  "hidapi",

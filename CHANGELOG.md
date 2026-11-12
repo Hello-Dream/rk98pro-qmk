@@ -5,6 +5,31 @@
 > [!NOTE]
 > 自定义 EEPROM 设置（`hs_settings`、按键 RGB 录制、侧灯 HSV 槽位）带有版本号与 CRC。首次刷入或检测到版本/CRC 不符时，固件会恢复默认设置，并同步刷新 VIA 缓存，正常无需手动清空 EEPROM；降级或数据异常时仍可按 [README.md](README.md#upgrade-eeprom) 手动清空。
 
+## [1.0.3] - 2026-11-12
+
+### 固件结构重构
+
+- 板级文件 `rk98pro_us_triple_mode.c` 缩为 QMK hook 接线；GPIO/启动编排、设置、按键处理、会话与主循环分别迁入 `hs/board_init`、`hs/settings`、`hs/key_handlers`、`hs/session`、`hs/runtime`。
+- `hs/wireless.c` 按职责拆为 `wireless_mode`、`wireless_blink`、`wireless_keys`、`wireless_sleep`、`wireless_indicator`，原文件只保留 base glue 与共享状态。
+- `hs/power.c` 拆出 `power_config.c`（VIA 配置、默认值、睡眠超时）与 `power_report.c`（无线上报）；空闲调光/低电状态机仍留在 `power.c`，共享内部状态不变。
+- 修复 `palcallback_cb` 中 `#ifdef` 与唤醒引脚不匹配的潜在编译问题；当前板型同时定义两个模式引脚，因此不影响现有行为。
+- 不修改 EEPROM 布局、`HS_SETTINGS_VERSION`、`HS_STATUS_SNAPSHOT_VERSION`、VIA ID、键码顺序、灯效顺序或 `process_record_kb` 的调用链。
+
+### 电源策略与测试
+
+- 调光/关灯档位、低电状态机和充电提示抽取为 `hs/power_policy.c/h` 纯逻辑，新增 `tests/firmware/test_power_policy.c` 主机侧测试。
+- CI 增加电源策略测试，与电池策略测试一起覆盖低电和空闲电源边界。
+
+### 上位机
+
+- 将原 `monitor.rs` 拆分为 `monitor/mod.rs`、`publisher.rs`、`runner.rs`、`tracker.rs`，行为与协议不变。
+- 收敛 monitor 模块引用风格，减少重复的完整路径引用。
+
+### 兼容性
+
+- 固件、VIA 定义与上位机版本号统一为 `1.0.3`。
+- 不改变键盘配置、状态快照协议、EEPROM 布局或现有用户设置；从 v1.0.2 升级无需手动清空 EEPROM。
+
 ## [1.0.2] - 2026-11-11
 
 ### 运行时与交付优化
