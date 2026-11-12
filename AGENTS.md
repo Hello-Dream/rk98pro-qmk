@@ -26,6 +26,11 @@ cc -std=c11 -Wall -Wextra -Werror \
   keyboards/royalkludge/rk98pro_us_triple_mode/hs/battery_policy.c \
   tests/firmware/test_battery_policy.c -o /tmp/test_battery_policy
 /tmp/test_battery_policy
+cc -std=c11 -Wall -Wextra -Werror \
+  -I keyboards/royalkludge/rk98pro_us_triple_mode/hs \
+  keyboards/royalkludge/rk98pro_us_triple_mode/hs/power_policy.c \
+  tests/firmware/test_power_policy.c -o /tmp/test_power_policy
+/tmp/test_power_policy
 (cd host && pnpm exec playwright install --with-deps chromium && pnpm test:e2e)
 ```
 
@@ -56,6 +61,7 @@ make royalkludge/rk98pro_us_triple_mode:default:flash
 - `hs/status.c/h`：只读状态快照、`seq`、raw HID 事件推送和 VIA `0x22` GET；状态检查按最近 GET 自适应 250ms/1s。
 - `hs/power.c/h`、`hs/battery.c/h`：电源/续航状态机、电量滤波与充满判定。
 - `hs/battery_policy.c/h`：不依赖 QMK 的电池滤波、低电确认与充满锁存纯逻辑；`tests/firmware/test_battery_policy.c` 覆盖其边界。
+- `hs/power_policy.c/h`：不依赖 QMK 的调光/关灯档位、低电状态机与充电提示纯逻辑；`tests/firmware/test_power_policy.c` 覆盖其边界。
 - `hs/indicators.c/h`：Caps/Num/Scroll/Win、侧灯状态提示、电量条和连接提示。
 - `hs/keys.c/h`：短按键过滤、`process_record_user` 与按键初始化。
 - `hs/rgb.c/h`：持久侧灯模式（当前只保存模式）、灯效选择与 RGB 录制集成；持久侧灯逻辑用 `#ifdef RGBLIGHT_ENABLE` 隔离，避免覆盖主键灯效。

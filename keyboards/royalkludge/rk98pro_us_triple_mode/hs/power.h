@@ -6,11 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-typedef enum {
-    HS_POWER_ACTIVE = 0,
-    HS_POWER_DIM,
-    HS_POWER_OFF,
-} hs_power_stage_t;
+#include "power_policy.h"
 
 uint8_t  hs_power_get_config(uint8_t value_id);
 void     hs_power_set_config(uint8_t value_id, uint8_t value);

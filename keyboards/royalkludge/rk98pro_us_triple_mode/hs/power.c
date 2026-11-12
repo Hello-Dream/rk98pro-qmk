@@ -15,11 +15,6 @@ static void hs_low_bat_refresh_cap(void);
 static void hs_low_bat_apply_cap(void);
 static void hs_low_bat_clear_cap(void);
 
-static const uint32_t hs_power_dim_table[]   = {0, 15000, 30000, 60000, 120000};
-static const uint32_t hs_power_off_table[]   = {0, 60000, 120000, 300000, 600000};
-static const uint8_t  hs_low_bat_thresholds[] = {0, 5, 10, 15, 20};
-static const uint8_t  hs_low_bat_brightness_table[] = {10, 30, 50, 100};
-
 static hs_power_stage_t hs_power_stage = HS_POWER_ACTIVE;
 static uint32_t hs_last_activity = 0;
 static HSV hs_saved_rgb_hsv;
@@ -27,41 +22,34 @@ static HSV hs_saved_side_hsv;
 static bool hs_saved_rgb_enabled = false;
 static bool hs_saved_side_enabled = false;
 static bool hs_saved_valid = false;
-static bool hs_low_bat_active = false;
+static power_policy_low_bat_state_t hs_low_bat_state;
 static bool hs_low_bat_capped = false;
 static uint8_t hs_low_bat_saved_val = 0;
 static bool hs_low_bat_side_capped = false;
 static uint8_t hs_low_bat_saved_side_val = 0;
-static bool hs_low_bat_warn_pending = false;
-static uint32_t hs_low_bat_last_warn = 0;
 static uint8_t hs_last_devs = 0xFF;
 static bool hs_power_devs_initialized = false;
 static bool hs_last_charging = false;
 static bool hs_last_full = false;
 
 static uint32_t hs_power_dim_ms(void) {
-    return hs_power_dim_table[hs_power.idle_dim < ARRAY_SIZE(hs_power_dim_table) ? hs_power.idle_dim : 2];
+    return power_policy_dim_ms(hs_power.idle_dim);
 }
 
 static uint32_t hs_power_off_ms(void) {
-    return hs_power_off_table[hs_power.idle_off < ARRAY_SIZE(hs_power_off_table) ? hs_power.idle_off : 2];
+    return power_policy_off_ms(hs_power.idle_off);
 }
 
 uint8_t hs_power_low_bat_threshold(void) {
-    uint8_t level = hs_power.low_bat_level;
-    if (level > 4) {
-        level = 3;
-    }
-    return hs_low_bat_thresholds[level];
+    return power_policy_low_bat_threshold(hs_power.low_bat_level);
 }
 
 static uint8_t hs_power_low_bat_brightness_pct(void) {
-    return hs_low_bat_brightness_table[hs_power.low_bat_brightness & 0x03];
+    return power_policy_low_bat_brightness_pct(hs_power.low_bat_brightness);
 }
 
 static uint8_t hs_low_bat_cap_value(void) {
-    uint8_t cap = (uint8_t)((uint16_t)RGB_MATRIX_MAXIMUM_BRIGHTNESS * hs_power_low_bat_brightness_pct() / 100);
-    return cap ? cap : 1;
+    return power_policy_low_bat_cap_value(hs_power_low_bat_brightness_pct(), RGB_MATRIX_MAXIMUM_BRIGHTNESS);
 }
 
 static void eeconfig_power_update(void) {
@@ -172,13 +160,11 @@ void hs_power_init(void) {
     hs_last_activity   = timer_read32();
     hs_saved_valid     = false;
     hs_power_rgb_off   = false;
-    hs_low_bat_active  = false;
+    power_policy_low_bat_reset(&hs_low_bat_state);
     hs_low_bat_capped  = false;
     hs_low_bat_saved_val = 0;
     hs_low_bat_side_capped = false;
     hs_low_bat_saved_side_val = 0;
-    hs_low_bat_warn_pending = false;
-    hs_low_bat_last_warn = 0;
     hs_status          = HS_STATUS_NONE;
     hs_status_force_rgb = false;
     hs_indicator_rgb_acquired = false;
@@ -190,10 +176,7 @@ void hs_power_init(void) {
 }
 
 static bool hs_power_should_save(void) {
-    if (wireless_get_current_devs() == DEVS_USB || charging_state) {
-        return hs_power.usb_save;
-    }
-    return true;
+    return power_policy_should_save(wireless_get_current_devs() == DEVS_USB || charging_state, hs_power.usb_save);
 }
 
 static void hs_power_save_snapshot(void) {
@@ -222,7 +205,7 @@ static void hs_power_restore(void) {
     }
 
     hs_saved_valid = false;
-    if (hs_low_bat_active) hs_low_bat_apply_cap();
+    if (hs_low_bat_state.active) hs_low_bat_apply_cap();
     hs_led_power_update();
 }
 
@@ -268,7 +251,7 @@ static void hs_power_enter_off(void) {
 }
 
 static void hs_low_bat_apply_cap(void) {
-    if (!hs_low_bat_active || hs_power_stage != HS_POWER_ACTIVE) return;
+    if (!hs_low_bat_state.active || hs_power_stage != HS_POWER_ACTIVE) return;
 
     uint8_t cap = hs_low_bat_cap_value();
 
@@ -327,7 +310,7 @@ static void hs_low_bat_clear_cap(void) {
 }
 
 static void hs_low_bat_refresh_cap(void) {
-    if (!hs_low_bat_active) return;
+    if (!hs_low_bat_state.active) return;
 
     uint8_t cap = hs_low_bat_cap_value();
 
@@ -361,7 +344,7 @@ void hs_power_activity(void) {
     if (hs_power_stage != HS_POWER_ACTIVE) {
         hs_power_restore();
     }
-    if (hs_low_bat_active) hs_low_bat_apply_cap();
+    if (hs_low_bat_state.active) hs_low_bat_apply_cap();
 }
 
 void hs_power_task(void) {
@@ -404,43 +387,27 @@ void hs_power_task(void) {
     if (charging_state != hs_last_charging || bat_full_flag != hs_last_full) {
         hs_last_charging = charging_state;
         hs_last_full     = bat_full_flag;
-        if (hs_status == HS_STATUS_NONE) {
-            if (charging_state) {
-                hs_status_show(bat_full_flag ? HS_STATUS_FULL : HS_STATUS_CHARGING, 3000, (RGB){0, 150, 0});
-            }
+        switch (power_policy_charge_toast(charging_state, bat_full_flag, hs_status != HS_STATUS_NONE)) {
+            case POWER_POLICY_CHARGE_TOAST_CHARGING:
+                hs_status_show(HS_STATUS_CHARGING, 3000, (RGB){0, 150, 0});
+                break;
+            case POWER_POLICY_CHARGE_TOAST_FULL:
+                hs_status_show(HS_STATUS_FULL, 3000, (RGB){0, 150, 0});
+                break;
+            default:
+                break;
         }
     }
 
-    if (!hs_power.low_bat_level) {
-        hs_low_bat_warn_pending = false;
-        hs_low_bat_active       = false;
+    uint8_t low_bat_actions = power_policy_low_bat_update(&hs_low_bat_state, battery, charging_state, hs_power.low_bat_level, now, hs_status != HS_STATUS_NONE);
+    if (low_bat_actions & POWER_POLICY_LOW_BAT_ACTION_WARN) {
+        hs_status_show(HS_STATUS_LOW_BAT, 3000, (RGB){150, 0, 0});
+    }
+    if (low_bat_actions & POWER_POLICY_LOW_BAT_ACTION_CLEAR_CAP) {
         hs_low_bat_clear_cap();
-    } else {
-        bool low = battery != 0xFF && !charging_state && (battery <= (uint8_t)(hs_power_low_bat_threshold() + (hs_low_bat_active ? 3 : 0)));
-        if (low) {
-            if (!hs_low_bat_active) {
-                hs_low_bat_active = true;
-                if (hs_status == HS_STATUS_NONE) {
-                    hs_low_bat_last_warn = now;
-                    hs_status_show(HS_STATUS_LOW_BAT, 3000, (RGB){150, 0, 0});
-                } else {
-                    // 首次提示被连接/充电动画占用时，等动画结束后补一次
-                    hs_low_bat_warn_pending = true;
-                }
-            } else {
-                uint32_t interval = (battery != 0xFF && battery <= 5) ? 300000 : 600000;
-                if ((hs_low_bat_warn_pending || timer_elapsed32(hs_low_bat_last_warn) >= interval) && hs_status == HS_STATUS_NONE) {
-                    hs_low_bat_warn_pending = false;
-                    hs_low_bat_last_warn    = now;
-                    hs_status_show(HS_STATUS_LOW_BAT, 3000, (RGB){150, 0, 0});
-                }
-            }
-            hs_low_bat_apply_cap();
-        } else if (hs_low_bat_active) {
-            hs_low_bat_active       = false;
-            hs_low_bat_warn_pending = false;
-            hs_low_bat_clear_cap();
-        }
+    }
+    if (low_bat_actions & POWER_POLICY_LOW_BAT_ACTION_APPLY_CAP) {
+        hs_low_bat_apply_cap();
     }
 
     if (!hs_power_should_save()) {
@@ -450,12 +417,11 @@ void hs_power_task(void) {
     if (hs_indicators_power_blocked()) return;
 
     uint32_t idle = timer_elapsed32(hs_last_activity);
-    uint32_t off  = hs_power_off_ms();
-    uint32_t dim  = hs_power_dim_ms();
+    hs_power_stage_t target = power_policy_idle_target(hs_power_stage, idle, hs_power_dim_ms(), hs_power_off_ms());
 
-    if (off && idle >= off) {
+    if (target == HS_POWER_OFF) {
         hs_power_enter_off();
-    } else if (dim && idle >= dim) {
+    } else if (target == HS_POWER_DIM) {
         hs_power_enter_dim();
     }
 }
@@ -470,8 +436,7 @@ static void hs_power_apply_settings(void) {
         hs_status_end();
     }
     if (!hs_power.low_bat_level) {
-        hs_low_bat_warn_pending = false;
-        hs_low_bat_active       = false;
+        power_policy_low_bat_disable(&hs_low_bat_state);
         hs_low_bat_clear_cap();
     }
     if (!hs_power_should_save() && hs_power_stage != HS_POWER_ACTIVE) {
@@ -483,13 +448,13 @@ static void hs_power_apply_settings(void) {
     if (hs_power_stage == HS_POWER_OFF && hs_power_off_ms() == 0) {
         hs_power_restore();
     }
-    if (hs_low_bat_active) hs_low_bat_apply_cap();
+    if (hs_low_bat_state.active) hs_low_bat_apply_cap();
 }
 
 const char *hs_power_state_name(void) {
     if (charging_state && bat_full_flag) return "Full";
     if (charging_state) return "Charging";
-    if (hs_low_bat_active) return "Low Battery";
+    if (hs_low_bat_state.active) return "Low Battery";
     if (hs_power_stage == HS_POWER_DIM) return "Dim";
     if (hs_power_stage == HS_POWER_OFF) return "Off";
     return "Active";
@@ -498,19 +463,18 @@ const char *hs_power_state_name(void) {
 uint8_t hs_power_state_code(void) {
     if (charging_state && bat_full_flag) return HS_POWER_STATE_FULL;
     if (charging_state) return HS_POWER_STATE_CHARGING;
-    if (hs_low_bat_active) return HS_POWER_STATE_LOW_BATTERY;
+    if (hs_low_bat_state.active) return HS_POWER_STATE_LOW_BATTERY;
     if (hs_power_stage == HS_POWER_DIM) return HS_POWER_STATE_DIM;
     if (hs_power_stage == HS_POWER_OFF) return HS_POWER_STATE_OFF;
     return HS_POWER_STATE_ACTIVE;
 }
 
 bool hs_power_low_battery_active(void) {
-    return hs_low_bat_active;
+    return hs_low_bat_state.active;
 }
 
 uint16_t hs_power_idle_seconds(void) {
-    uint32_t idle = timer_elapsed32(hs_last_activity) / 1000;
-    return idle > 0xFFFF ? 0xFFFF : (uint16_t)idle;
+    return power_policy_idle_seconds(timer_elapsed32(hs_last_activity));
 }
 
 void hs_send_bat_status(void) {

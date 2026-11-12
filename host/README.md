@@ -71,7 +71,7 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D w
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-固件电池保护纯逻辑测试在仓库根目录运行：
+固件电源/电池纯逻辑测试在仓库根目录运行：
 
 ```bash
 cc -std=c11 -Wall -Wextra -Werror \
@@ -79,6 +79,11 @@ cc -std=c11 -Wall -Wextra -Werror \
   keyboards/royalkludge/rk98pro_us_triple_mode/hs/battery_policy.c \
   tests/firmware/test_battery_policy.c -o /tmp/test_battery_policy
 /tmp/test_battery_policy
+cc -std=c11 -Wall -Wextra -Werror \
+  -I keyboards/royalkludge/rk98pro_us_triple_mode/hs \
+  keyboards/royalkludge/rk98pro_us_triple_mode/hs/power_policy.c \
+  tests/firmware/test_power_policy.c -o /tmp/test_power_policy
+/tmp/test_power_policy
 ```
 
 ## Linux 安装与 HID 权限

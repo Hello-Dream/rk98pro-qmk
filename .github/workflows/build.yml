@@ -98,6 +98,15 @@ jobs:
             -o /tmp/test_battery_policy
           /tmp/test_battery_policy
 
+      - name: Test power policy
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror \
+            -I keyboards/royalkludge/rk98pro_us_triple_mode/hs \
+            keyboards/royalkludge/rk98pro_us_triple_mode/hs/power_policy.c \
+            tests/firmware/test_power_policy.c \
+            -o /tmp/test_power_policy
+          /tmp/test_power_policy
+
       - name: Check host read-only API surface
         run: |
           if grep -nE "set_device_setting|write_block|keymap_write|rgb_write|wireless_switch|wireless_pair|wireless_clear|capture_key|import_config|show_battery" host/src/lib/api.ts; then
