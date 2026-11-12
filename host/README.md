@@ -45,7 +45,11 @@ host/
 └── src-tauri/src/
     ├── device.rs           打开 VIA HID、GET 0x22、读取 0xE0 事件
     ├── status.rs           快照解析与显示归一化
-    ├── monitor.rs          心跳、事件循环、通知、历史采样
+    ├── monitor/
+    │   ├── mod.rs          共享状态与命令侧方法
+    │   ├── tracker.rs      低电/充满/断连通知状态机
+    │   ├── runner.rs       心跳、事件循环与重连
+    │   └── publisher.rs    状态、历史、WPM 发布与落盘
     ├── wpm.rs              WPM 统计
     ├── history.rs          电量采样与事件
     ├── preferences.rs      通知偏好
