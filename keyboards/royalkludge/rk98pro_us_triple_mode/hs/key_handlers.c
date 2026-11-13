@@ -43,7 +43,7 @@ bool hs_key_handlers_process(uint16_t keycode, keyrecord_t *record) {
         case RL_MOD: {
             if (record->event.pressed) {
                 im_rgblight_increase();
-                hs_settings.side_light_mode = hs_rl_mode;
+                hs_settings.side_light_mode = hs_get_side_light_mode();
                 hs_settings_update();
             }
 
@@ -57,7 +57,7 @@ bool hs_key_handlers_process(uint16_t keycode, keyrecord_t *record) {
         case UG_TOGG: {
             if (record->event.pressed) {
                 // 空闲关灯时：逻辑背光原为开则第一次按键只负责唤醒；原为关则恢复后正常打开
-                if (hs_power_rgb_off) {
+                if (hs_indicator_power_off()) {
                     bool wake_only = mm_get_rgb_enable();
                     hs_power_activity();
                     if (wake_only) {
@@ -202,7 +202,7 @@ bool hs_key_handlers_process(uint16_t keycode, keyrecord_t *record) {
                 }
                 if (!rgbrec_is_started()) {
                     rgbrec_start(hs_settings.rgbrec_channel);
-                    no_record_fg = false;
+                    hs_rgb_record_flag_set(false);
                     rgbrec_set_close_all(HSV_BLACK);
                     ind_set_blink(ind_state_blinkon);
                 } else {
@@ -219,8 +219,8 @@ bool hs_key_handlers_process(uint16_t keycode, keyrecord_t *record) {
                 if (rgb_matrix_get_mode() == RGB_MATRIX_CUSTOM_RGBR_PLAY) {
                     if (rgbrec_is_started()) {
                         rgbrec_end_current(false); // 退出预览不保存本次未完成的录制
-                        no_record_fg = false;
-                        if (ind_status == ind_state_blinkon) ind_set_blink(ind_state_none);
+                        hs_rgb_record_flag_set(false);
+                        if (ind_status_get() == ind_state_blinkon) ind_set_blink(ind_state_none);
                     }
                     uint8_t last_mode = hs_settings.last_rgb_mode;
                     if (last_mode > 0 && last_mode < RGB_MATRIX_EFFECT_MAX && last_mode != RGB_MATRIX_CUSTOM_RGBR_PLAY) {

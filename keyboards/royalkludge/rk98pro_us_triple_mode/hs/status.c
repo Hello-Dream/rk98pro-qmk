@@ -31,7 +31,6 @@
 extern uint8_t  hs_power_state_code(void);
 extern bool     hs_power_low_battery_active(void);
 extern uint16_t hs_power_idle_seconds(void);
-extern bool     charging_state;
 
 static uint8_t  hs_status_seq;
 static uint32_t hs_status_session_at;
@@ -51,7 +50,7 @@ static void hs_status_build_snapshot(hs_status_snapshot_t *snapshot) {
     snapshot->fw_patch         = HS_FIRMWARE_VERSION_PATCH;
     snapshot->settings_version = HS_SETTINGS_VERSION;
     snapshot->battery          = battery > 100 ? 0xFF : battery;
-    snapshot->charging         = charging_state ? (hs_battery_is_full() ? 2 : 1) : 0;
+    snapshot->charging         = hs_battery_charging() ? (hs_battery_is_full() ? 2 : 1) : 0;
     snapshot->power_state      = hs_power_state_code();
     snapshot->layer            = get_highest_layer(layer_state);
     snapshot->default_layer    = get_highest_layer(default_layer_state);

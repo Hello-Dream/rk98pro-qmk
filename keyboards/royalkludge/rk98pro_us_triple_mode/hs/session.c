@@ -13,7 +13,16 @@
 #include "rgb_matrix_blink.h"
 
 static uint32_t ee_clr_timer = 0;
-bool            lower_sleep  = false;
+static bool     lower_sleep  = false;
+
+/* 低电保护深睡标记：由 indicators 置位、wireless_sleep 读写。 */
+bool hs_session_lower_sleep(void) {
+    return lower_sleep;
+}
+
+void hs_session_lower_sleep_set(bool value) {
+    lower_sleep = value;
+}
 
 void hs_session_ee_clr_event(bool pressed) {
     if (pressed) {
@@ -33,12 +42,12 @@ void hs_session_task(void) {
 
 void hs_reset_settings(void) {
     hs_store_flush();
-    ind_status = ind_state_none;
+    ind_status_reset();
     rgb_matrix_blink_set_remain_time(RGB_MATRIX_BLINK_INDEX_IND, 0);
-    hs_bat_force_rgb = false;
-    hs_wls_force_rgb = false;
+    hs_bat_force_clear();
+    hs_wls_force_clear();
 #if defined(WIRELESS_ENABLE) && defined(RGB_MATRIX_ENABLE)
-    wls_rgb_indicator_timer = 0;
+    hs_wls_indicator_timer_reset();
 #endif
 
     eeconfig_init();
@@ -136,7 +145,7 @@ bool hs_session_allow_timeout(void) {
     // 低电时不要进入普通休眠：让主循环继续运行，由 hs_bat_indicators_task()
     // 完成 20 秒保护提示后再进入只允许充电唤醒的保护深睡，
     // 避免普通休眠中电量耗尽到 0%，触发电池保护板锁死。
-    if (!lower_sleep && !charging_state && hs_battery_low_confirmed()) {
+    if (!lower_sleep && !hs_battery_charging() && hs_battery_low_confirmed()) {
         return false;
     }
 

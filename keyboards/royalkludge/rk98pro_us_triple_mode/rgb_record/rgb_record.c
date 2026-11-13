@@ -324,14 +324,11 @@ bool rgbrec_register_record(uint16_t keycode, keyrecord_t *record) {
     return false;
 }
 
-bool hs_user_datablock_reset = false;
-
 void eeconfig_init_user_datablock(void) {
     // 先写入 EECONFIG_USER 版本标记（并清零数据区）。否则 eeconfig_prepare_datablocks()
     // 会在每次启动时都判定数据区无效，导致设置、键位和录制数据反复复位。
     nvm_eeconfig_init_user_datablock();
     hs_store_reset();
-    hs_user_datablock_reset = true;
 }
 
 uint8_t find_index(void) {
@@ -407,7 +404,16 @@ uint8_t record_color_hsv(bool status) {
     return rgb_hsv_index;
 }
 
-bool rk_bat_req_flag;
+static bool rk_bat_req_flag;
+
+/* 电量条显示请求：indicators 置位/清除，渲染查询。 */
+bool rgbrec_bat_requested(void) {
+    return rk_bat_req_flag;
+}
+
+void rgbrec_bat_request_set(bool requested) {
+    rk_bat_req_flag = requested;
+}
 
 void query(void) {
     if (rk_bat_req_flag) {

@@ -10,6 +10,12 @@
 #define HS_WLS_FORCE_TIMEOUT (HS_PAIR_TIMEOUT + HS_SUCCEED_TIME + 1000)
 
 static uint32_t hs_connect_ok_time = 0;
+static bool     linker_ok          = false;
+
+/* 无线/有线的连接稳定标记，渲染路径与连接提示共用。 */
+bool hs_wireless_linker_ok(void) {
+    return linker_ok;
+}
 
 void hs_rgb_blink_hook_user(void) {
 
@@ -50,16 +56,21 @@ void hs_rgb_blink_hook_user(void) {
 #ifdef RGB_MATRIX_ENABLE
 
 #    ifdef WIRELESS_ENABLE
-bool wls_rgb_indicator_reset        = false;
-uint32_t wls_rgb_indicator_timer    = 0x00;
-uint32_t wls_rgb_indicator_interval = 0;
-uint32_t wls_rgb_indicator_times    = 0;
-uint32_t wls_rgb_indicator_index    = 0;
-RGB wls_rgb_indicator_rgb           = {0};
+static bool     wls_rgb_indicator_reset    = false;
+static uint32_t wls_rgb_indicator_timer    = 0x00;
+static uint32_t wls_rgb_indicator_interval = 0;
+static uint32_t wls_rgb_indicator_times    = 0;
+static uint32_t wls_rgb_indicator_index    = 0;
+static RGB      wls_rgb_indicator_rgb      = {0};
+
+/* 清除通道指示闪烁计时（复位/休眠/唤醒时由外部模块调用）。 */
+void hs_wls_indicator_timer_reset(void) {
+    wls_rgb_indicator_timer = 0x00;
+}
 
 void rgb_matrix_wls_indicator_set(uint8_t index, RGB rgb, uint32_t interval, uint8_t times) {
 
-    hs_wls_force_timer = timer_read32();
+    hs_wls_force_mark();
     hs_wls_indicator_force_begin(); // 背光关闭时也要显示连接/配对指示
 
     wls_rgb_indicator_timer = timer_read32();
@@ -186,16 +197,16 @@ void hs_wls_connected_indicator(void) {
 
 // 配对闪烁与连接成功提示都结束后，若背光是临时点亮的则恢复关闭
 void hs_wls_indicator_force_task(void) {
-    if (!hs_wls_force_rgb || hs_bat_force_rgb) return;
+    if (!hs_wls_force_active() || hs_bat_force_active()) return;
 
-    bool expired = timer_elapsed32(hs_wls_force_start) >= HS_WLS_FORCE_TIMEOUT;
+    bool expired = timer_elapsed32(hs_wls_force_start_time()) >= HS_WLS_FORCE_TIMEOUT;
     if (!expired) {
         if (!linker_ok) return;
         // 正常闪烁会在连接提示期内归零；若切换设备时残留计时，最多再等 HS_SUCCEED_TIME 强制结束
-        if (wls_rgb_indicator_timer != 0 && timer_elapsed32(hs_wls_force_timer) < HS_SUCCEED_TIME) return;
+        if (wls_rgb_indicator_timer != 0 && timer_elapsed32(hs_wls_force_last_time()) < HS_SUCCEED_TIME) return;
     }
 
-    hs_wls_force_rgb        = false;
+    hs_wls_force_clear();
     wls_rgb_indicator_timer = 0; // 配对失败后停止重启闪烁，避免唤醒后重复临时点亮
     hs_indicator_rgb_release();
 }

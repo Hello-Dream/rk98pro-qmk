@@ -47,7 +47,7 @@ uint32_t wls_process_long_press(uint32_t trigger_time, void *cb_arg) {
             hs_modeio_detection(true, &mode, hs_settings.last_bt_channel);
             if ((mode == hs_bt) || (mode == hs_wireless) || (mode == hs_none)) {
                 wireless_devs_change(wireless_get_current_devs(), DEVS_BT1, true);
-                state = true;
+                hs_wireless_state_set(true);
                 hs_rgb_blink_set_timer(timer_read32());
             }
 
@@ -57,7 +57,7 @@ uint32_t wls_process_long_press(uint32_t trigger_time, void *cb_arg) {
             hs_modeio_detection(true, &mode, hs_settings.last_bt_channel);
             if ((mode == hs_bt) || (mode == hs_wireless) || (mode == hs_none)) {
                 wireless_devs_change(wireless_get_current_devs(), DEVS_BT2, true);
-                state = true;
+                hs_wireless_state_set(true);
                 hs_rgb_blink_set_timer(timer_read32());
             }
         } break;
@@ -66,7 +66,7 @@ uint32_t wls_process_long_press(uint32_t trigger_time, void *cb_arg) {
             hs_modeio_detection(true, &mode, hs_settings.last_bt_channel);
             if ((mode == hs_bt) || (mode == hs_wireless) || (mode == hs_none)) {
                 wireless_devs_change(wireless_get_current_devs(), DEVS_BT3, true);
-                state = true;
+                hs_wireless_state_set(true);
                 hs_rgb_blink_set_timer(timer_read32());
             }
         } break;
@@ -75,7 +75,7 @@ uint32_t wls_process_long_press(uint32_t trigger_time, void *cb_arg) {
             hs_modeio_detection(true, &mode, hs_settings.last_bt_channel);
             if ((mode == hs_2g4) || (mode == hs_wireless) || (mode == hs_none)) {
                 wireless_devs_change(wireless_get_current_devs(), DEVS_2G4, true);
-                state = true;
+                hs_wireless_state_set(true);
                 hs_rgb_blink_set_timer(timer_read32());
             }
         } break;
@@ -116,7 +116,7 @@ bool process_record_wls(uint16_t keycode, keyrecord_t *record) {
 
                 if (record->event.pressed) {
                     suspend_wakeup_init();
-                    state = false;
+                    hs_wireless_state_set(false);
                     hs_rgb_blink_set_timer(timer_read32());
                 }
             }
@@ -130,7 +130,7 @@ bool process_record_wls(uint16_t keycode, keyrecord_t *record) {
 
                 if (record->event.pressed) {
                     suspend_wakeup_init();
-                    state = false;
+                    hs_wireless_state_set(false);
                     hs_rgb_blink_set_timer(timer_read32());
                 }
             }
@@ -144,7 +144,7 @@ bool process_record_wls(uint16_t keycode, keyrecord_t *record) {
 
                 if (record->event.pressed) {
                     suspend_wakeup_init();
-                    state = false;
+                    hs_wireless_state_set(false);
                     hs_rgb_blink_set_timer(timer_read32());
                 }
             }
@@ -158,7 +158,7 @@ bool process_record_wls(uint16_t keycode, keyrecord_t *record) {
 
                 if (record->event.pressed) {
                     suspend_wakeup_init();
-                    state = false;
+                    hs_wireless_state_set(false);
                     hs_rgb_blink_set_timer(timer_read32());
                 }
             }
@@ -169,7 +169,7 @@ bool process_record_wls(uint16_t keycode, keyrecord_t *record) {
             hs_modeio_detection(true, &mode, hs_settings.last_bt_channel);
             if ((mode == hs_2g4) || (mode == hs_wireless) || (mode == hs_none)) {
                 WLS_KEYCODE_EXEC(DEVS_USB);
-                state = false;
+                hs_wireless_state_set(false);
                 hs_rgb_blink_set_timer(timer_read32());
             }
         } break;

@@ -8,8 +8,8 @@
 #include "timer.h"
 #include "wireless.h"
 
-bool charging_state = false;
-bool bat_full_flag  = false;
+static bool charging_state = false;
+static bool bat_full_flag  = false;
 
 #define HS_BATTERY_FILTER_MS              1000
 #define HS_BATTERY_PIN_DEBOUNCE_MS        500
@@ -36,6 +36,10 @@ uint8_t hs_battery_percent(void) {
 
 bool hs_battery_low_confirmed(void) {
     return battery_low_confirmed(&hs_battery_filter, HS_BATTERY_LOW_CONFIRM);
+}
+
+bool hs_battery_charging(void) {
+    return charging_state;
 }
 
 bool hs_battery_is_full(void) {

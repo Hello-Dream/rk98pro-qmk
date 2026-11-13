@@ -7,6 +7,8 @@
 #include <stdint.h>
 
 /* EE_CLR 计时、USB/挂起/唤醒与设置复位。 */
+bool hs_session_lower_sleep(void);
+void hs_session_lower_sleep_set(bool value);
 void hs_session_ee_clr_event(bool pressed);
 void hs_session_task(void);
 void hs_reset_settings(void);

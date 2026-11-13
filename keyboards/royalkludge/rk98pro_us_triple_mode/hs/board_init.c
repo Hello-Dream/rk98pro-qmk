@@ -100,20 +100,20 @@ void hs_board_init(void) {
 #if !(defined(MM_BT_DEF_PIN) && defined(MM_2G4_DEF_PIN))
     wireless_devs_change(!DEVS_USB, hs_settings.wireless_mode, false);
 #endif
-    post_init_timer = timer_read32();
+    hs_wireless_post_init_begin();
 #endif
 }
 
 void hs_board_init_post(void) {
-    ind_status = ind_state_none;
+    ind_status_reset();
     if (hs_settings.rgbrec_channel >= RGBREC_CHANNEL_NUM) {
         hs_settings.rgbrec_channel = 0;
         hs_settings_update();
     }
     rgbrec_init(hs_settings.rgbrec_channel);
-    hs_rl_mode = hs_settings.side_light_mode;
-    if (hs_rl_mode >= ARRAY_SIZE(buff)) {
-        hs_rl_mode              = 0;
+    hs_rgb_side_light_mode_set_boot(hs_settings.side_light_mode);
+    if (hs_get_side_light_mode() >= hs_rgb_side_light_mode_count()) {
+        hs_rgb_side_light_mode_set_boot(0);
         hs_settings.side_light_mode = 0;
         hs_settings_update();
     }

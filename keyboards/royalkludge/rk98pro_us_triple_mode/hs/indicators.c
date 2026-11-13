@@ -6,29 +6,28 @@
 #include "hs/wireless_glue.h"
 #include "hs/store.h"
 #include "hs/rgb.h"
+#include "hs/session.h"
 
 #include "rgb_record/rgb_record.h"
 #include "rgb_matrix_blink.h"
 #include "lowpower.h"
 
-extern bool lower_sleep;
-extern bool rk_bat_req_flag;
 extern uint8_t hs_power_low_bat_threshold(void);
 
-ind_status_t ind_status      = ind_state_none;
-uint32_t    hs_bat_show_timer = 0;
-bool hs_bat_force_rgb     = false; // 背光原本关闭时，为显示电量条临时点亮的标记
-bool hs_wls_force_rgb     = false; // 背光原本关闭时，为显示无线连接指示临时点亮的标记
-bool hs_status_force_rgb  = false; // 侧灯状态覆盖层临时点亮的标记
-bool hs_power_rgb_off     = false; // 空闲关灯期间强制关闭 RGB / LED 供电
-bool hs_indicator_rgb_acquired = false; // 状态灯是否临时启用过 RGB 矩阵
-bool hs_indicator_rgb_was_enabled = false; // 临时启用前的矩阵开关状态
-uint32_t hs_wls_force_timer = 0;   // 最近一次通道指示动画时刻（用于清理残留闪烁计时）
-uint32_t hs_wls_force_start = 0;   // 本轮临时背光的起始时刻（不随闪烁重启）
-hs_status_t hs_status = HS_STATUS_NONE;
-uint32_t hs_status_start = 0;
-uint32_t hs_status_duration = 0;
-RGB hs_status_color = {0};
+static ind_status_t ind_status = ind_state_none;
+static uint32_t hs_bat_show_timer = 0;
+static bool hs_bat_force_rgb     = false; // 背光原本关闭时，为显示电量条临时点亮的标记
+static bool hs_wls_force_rgb     = false; // 背光原本关闭时，为显示无线连接指示临时点亮的标记
+static bool hs_status_force_rgb  = false; // 侧灯状态覆盖层临时点亮的标记
+static bool hs_power_rgb_off     = false; // 空闲关灯期间强制关闭 RGB / LED 供电
+static bool hs_indicator_rgb_acquired = false; // 状态灯是否临时启用过 RGB 矩阵
+static bool hs_indicator_rgb_was_enabled = false; // 临时启用前的矩阵开关状态
+static uint32_t hs_wls_force_timer = 0;   // 最近一次通道指示动画时刻（用于清理残留闪烁计时）
+static uint32_t hs_wls_force_start = 0;   // 本轮临时背光的起始时刻（不随闪烁重启）
+static hs_status_t hs_status = HS_STATUS_NONE;
+static uint32_t hs_status_start = 0;
+static uint32_t hs_status_duration = 0;
+static RGB hs_status_color = {0};
 
 blink_rgb_t blink_rgbs[RGB_MATRIX_BLINK_COUNT] = {
     {.index = HS_RGB_BLINK_INDEX_WIN, .interval = 250, .times = 1, .color = {.r = 0xFF, .g = 0xFF, .b = 0xFF}, .blink_cb = NULL},
@@ -64,10 +63,10 @@ void hs_bat_indicators_task(void) {
     static uint32_t battery_process_time = 0;
     uint8_t         battery              = hs_battery_percent();
 
-    if (charging_state && bat_full_flag) { // 充满
+    if (hs_battery_is_full()) { // 充满
         battery_process_time = 0;
         gpio_write_pin(LED_POV_PIN, 1);
-    } else if (charging_state) { // 充电中
+    } else if (hs_battery_charging()) { // 充电中
         battery_process_time = 0;
         gpio_write_pin(LED_POV_PIN, 0);
     } else if (hs_power.low_bat_level > 0 && battery != 0xFF && battery <= hs_power_low_bat_threshold()) { // 低电：侧灯提示，Win 灯只保留 Win 锁定
@@ -81,7 +80,7 @@ void hs_bat_indicators_task(void) {
             if (battery_process_time && timer_elapsed32(battery_process_time) > 20000) {
                 battery_process_time = 0;
                 clear_keyboard();
-                lower_sleep = true;
+                hs_session_lower_sleep_set(true);
                 gpio_write_pin(LED_MAC_PIN, 0);
                 gpio_write_pin(LED_POV_PIN, 1);
                 md_send_devctrl(MD_SND_CMD_DEVCTRL_USB);
@@ -132,6 +131,14 @@ void ind_set_blink(ind_status_t status) {
     ind_status = status;
     rgb_matrix_blink_set_remain_time(RGB_MATRIX_BLINK_INDEX_IND, 0x00);
     ind_indicators_hook(RGB_MATRIX_BLINK_INDEX_IND);
+}
+
+ind_status_t ind_status_get(void) {
+    return ind_status;
+}
+
+void ind_status_reset(void) {
+    ind_status = ind_state_none;
 }
 
 bool rgb_matrix_blink_user(blink_rgb_t *blink_rgb) {
@@ -217,6 +224,26 @@ void hs_power_rgb_user_enabled(void) {
     }
 }
 
+bool hs_indicator_power_off(void) {
+    return hs_power_rgb_off;
+}
+
+void hs_indicator_power_off_set(bool off) {
+    hs_power_rgb_off = off;
+}
+
+void hs_indicator_rgb_acquired_clear(void) {
+    hs_indicator_rgb_acquired = false;
+}
+
+/* 用户真正打开背光时，撤销电量条/无线指示的临时点亮标记。 */
+void hs_indicator_user_rgb_on(void) {
+    if (mm_get_rgb_enable() && !hs_power_rgb_off && !hs_indicator_rgb_acquired) {
+        hs_bat_force_rgb = false;
+        hs_wls_force_clear();
+    }
+}
+
 void hs_indicator_rgb_acquire(void) {
     if (mm_get_rgb_enable() && !hs_power_rgb_off && rgb_matrix_is_enabled()) return;
 
@@ -246,6 +273,26 @@ void hs_indicator_rgb_release(void) {
 #endif
     }
     hs_indicator_rgb_acquired = false;
+}
+
+bool hs_wls_force_active(void) {
+    return hs_wls_force_rgb;
+}
+
+void hs_wls_force_clear(void) {
+    hs_wls_force_rgb = false;
+}
+
+uint32_t hs_wls_force_start_time(void) {
+    return hs_wls_force_start;
+}
+
+uint32_t hs_wls_force_last_time(void) {
+    return hs_wls_force_timer;
+}
+
+void hs_wls_force_mark(void) {
+    hs_wls_force_timer = timer_read32();
 }
 
 void hs_wls_indicator_force_begin(void) {
@@ -280,6 +327,34 @@ void hs_status_end(void) {
         hs_status_force_rgb = false;
         hs_indicator_rgb_release();
     }
+}
+
+bool hs_status_busy(void) {
+    return hs_status != HS_STATUS_NONE;
+}
+
+bool hs_status_is(hs_status_t type) {
+    return hs_status == type;
+}
+
+bool hs_status_force_active(void) {
+    return hs_status_force_rgb;
+}
+
+/* 承接状态灯 overlay 的过期/强制清理，保持在 power task 原位置调用。 */
+void hs_status_overlay_task(void) {
+    if (hs_status != HS_STATUS_NONE && timer_elapsed32(hs_status_start) >= hs_status_duration) {
+        hs_status_end();
+    }
+    if (hs_status == HS_STATUS_NONE && hs_status_force_rgb) {
+        hs_status_end();
+    }
+}
+
+/* 初始化时清 overlay/force，不释放 RGB（与原 power init 行为一致）。 */
+void hs_status_reset(void) {
+    hs_status           = HS_STATUS_NONE;
+    hs_status_force_rgb = false;
 }
 
 void hs_status_render(uint8_t led_min, uint8_t led_max) {
@@ -331,15 +406,33 @@ bool hs_indicators_power_blocked(void) {
     return false;
 }
 
+bool hs_bat_force_active(void) {
+    return hs_bat_force_rgb;
+}
+
+void hs_bat_force_clear(void) {
+    hs_bat_force_rgb = false;
+}
+
 void hs_bat_show(void) {
-    extern bool rk_bat_req_flag;
     hs_power_activity();
-    rk_bat_req_flag   = true;
+    rgbrec_bat_request_set(true);
     hs_bat_show_timer = timer_read32();
     // 背光被关闭、矩阵被 VIA 关闭或处于空闲关灯时，临时打开 LED 供电与背光，保证电量条仍能显示，3 秒后再恢复
     if (!mm_get_rgb_enable() || hs_power_rgb_off || !rgb_matrix_is_enabled()) {
         hs_bat_force_rgb = true;
         hs_indicator_rgb_acquire();
+    }
+}
+
+/* 电量条显示约 3 秒后自动关闭，并恢复临时打开的背光。 */
+void hs_bat_show_task(void) {
+    if (!rgbrec_bat_requested() || timer_elapsed32(hs_bat_show_timer) <= 3000) return;
+
+    rgbrec_bat_request_set(false);
+    if (hs_bat_force_active()) {
+        hs_bat_force_clear();
+        hs_indicator_rgb_release();
     }
 }
 

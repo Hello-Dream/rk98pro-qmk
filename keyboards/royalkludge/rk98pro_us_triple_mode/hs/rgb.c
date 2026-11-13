@@ -10,9 +10,9 @@
 #include "rgb_record/rgb_record.h"
 #include "rgb_record/rgb_rgblight.h"
 
-uint8_t buff[11] = {2, 3, 4, 5, 6, 7, 8, 1, 1, 1, 0};
-uint8_t hs_rl_mode = 0;
-bool    no_record_fg;
+static uint8_t buff[11] = {2, 3, 4, 5, 6, 7, 8, 1, 1, 1, 0};
+static uint8_t hs_rl_mode = 0;
+static bool    no_record_fg;
 
 // 应用侧灯模式：索引对应 buff[]，10 为关闭
 static void hs_rl_apply_mode_internal(uint8_t mode, bool persist) {
@@ -109,6 +109,27 @@ void im_rgblight_increase(void) {
 
 uint8_t hs_get_side_light_mode(void) {
     return hs_rl_mode;
+}
+
+/* set_boot 只写当前模式索引，不持久化也不驱动硬件；硬件重放仍由 hs_settings_apply_boot() 负责。 */
+void hs_rgb_side_light_mode_set_boot(uint8_t mode) {
+    hs_rl_mode = mode;
+}
+
+uint8_t hs_rgb_side_light_mode_count(void) {
+    return ARRAY_SIZE(buff);
+}
+
+uint8_t hs_rgb_side_light_default_mode(void) {
+    return buff[0];
+}
+
+bool hs_rgb_record_flag(void) {
+    return no_record_fg;
+}
+
+void hs_rgb_record_flag_set(bool value) {
+    no_record_fg = value;
 }
 
 // 设置并保存侧灯模式（VIA 菜单使用）

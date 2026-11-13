@@ -5,6 +5,8 @@
 #include "wireless.h"
 #include "usb_main.h"
 
+#include "hs/battery.h"
+
 #ifndef LPWR_TIMEOUT
 #    define LPWR_TIMEOUT 300000 // 5min
 #endif
@@ -152,8 +154,7 @@ bool lpwr_is_allow_timeout(void) {
 
 bool lpwr_is_allow_presleep_hook(void) __attribute__((weak));
 bool lpwr_is_allow_presleep_hook(void) {
-    extern bool charging_state;
-    if ((wireless_get_current_devs() == DEVS_USB) && (!charging_state)) {
+    if ((wireless_get_current_devs() == DEVS_USB) && (!hs_battery_charging())) {
 
         if (USB_DRIVER.state != USB_STOP) {
             usb_power_disconnect();

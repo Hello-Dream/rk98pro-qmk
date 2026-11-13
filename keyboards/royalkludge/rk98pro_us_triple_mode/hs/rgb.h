@@ -6,9 +6,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-extern uint8_t hs_rl_mode;
-extern uint8_t buff[11];
-extern bool    no_record_fg;
+void hs_rgb_side_light_mode_set_boot(uint8_t mode);
+uint8_t hs_rgb_side_light_mode_count(void);
+uint8_t hs_rgb_side_light_default_mode(void);
+bool hs_rgb_record_flag(void);
+void hs_rgb_record_flag_set(bool value);
 
 void hs_settings_apply_boot(void);
 void im_rgblight_increase(void);

@@ -6,4 +6,5 @@
 #include <stdbool.h>
 
 /* wireless 模块之间共享的内部状态，不加入公开头。 */
-extern bool state;
+bool hs_wireless_state_get(void);
+void hs_wireless_state_set(bool value);

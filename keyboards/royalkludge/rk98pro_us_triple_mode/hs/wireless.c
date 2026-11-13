@@ -4,9 +4,21 @@
 #include "hs/wireless_glue.h"
 #include "hs/store.h"
 
-uint32_t post_init_timer     = 0x00;
-bool state                   = false;
-bool linker_ok        = false;
+static uint32_t post_init_timer = 0x00;
+static bool     state           = false;
+
+/* 上电后延迟 100ms 再下发无线模块的初始化命令。 */
+void hs_wireless_post_init_begin(void) {
+    post_init_timer = timer_read32();
+}
+
+bool hs_wireless_state_get(void) {
+    return state;
+}
+
+void hs_wireless_state_set(bool value) {
+    state = value;
+}
 
 void wireless_post_task(void) {
 

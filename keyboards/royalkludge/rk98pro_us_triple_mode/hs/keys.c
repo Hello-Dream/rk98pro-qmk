@@ -116,11 +116,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         case MO(_FL):
         case MO(_MFL): {
             if (!record->event.pressed && rgbrec_is_started()) {
-                if (no_record_fg == true) {
-                    no_record_fg = false;
+                if (hs_rgb_record_flag() == true) {
+                    hs_rgb_record_flag_set(false);
                     rgbrec_register_record(keycode, record);
                 }
-                no_record_fg = true;
+                hs_rgb_record_flag_set(true);
             }
             break;
         }

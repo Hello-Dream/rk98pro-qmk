@@ -5,6 +5,7 @@
 #include "hs/wireless_internal.h"
 #include "hs/indicators.h"
 #include "hs/power.h"
+#include "hs/session.h"
 #include "hs/store.h"
 
 #include "usb_main.h"
@@ -26,7 +27,7 @@ void lpwr_exti_init_hook(void) {
     palEnableLineEvent(HS_2G4_DEF_PIN, PAL_EVENT_MODE_BOTH_EDGES);
 #endif
 
-    if (lower_sleep) {
+    if (hs_session_lower_sleep()) {
 #if DIODE_DIRECTION == ROW2COL
         for (uint8_t i = 0; i < ARRAY_SIZE(col_pins); i++) {
             if (col_pins[i] != NO_PIN) {
@@ -96,8 +97,8 @@ void lpwr_stop_hook_pre(void) { // wireless sleep
     gpio_write_pin(LED_MAC_PIN, !LED_PIN_ON_STATE);
 #endif
 
-    state = false;
-    if (lower_sleep) {
+    hs_wireless_state_set(false);
+    if (hs_session_lower_sleep()) {
         md_send_devctrl(MD_SND_CMD_DEVCTRL_USB);
         wait_ms(200);
         lpwr_set_sleep_wakeupcd(LPWR_WAKEUP_UART);
@@ -105,11 +106,11 @@ void lpwr_stop_hook_pre(void) { // wireless sleep
 }
 
 void lpwr_stop_hook_post(void) {
-    if (lower_sleep) {
+    if (hs_session_lower_sleep()) {
         switch (lpwr_get_sleep_wakeupcd()) {
             case LPWR_WAKEUP_USB:
             case LPWR_WAKEUP_CABLE: {
-                lower_sleep = false;
+                hs_session_lower_sleep_set(false);
                 lpwr_set_state(LPWR_WAKEUP);
             } break;
             default: {
@@ -137,8 +138,8 @@ void hs_set_sleep_state(void) {
 void lpwr_wakeup_hook(void) { // wireless wakeup
 #if defined(WIRELESS_ENABLE) && defined(RGB_MATRIX_ENABLE)
     // 睡眠期间 LED 供电已关闭；清掉旧的临时点亮状态，唤醒后按新的连接状态重新申请
-    hs_wls_force_rgb        = false;
-    wls_rgb_indicator_timer = 0;
+    hs_wls_force_clear();
+    hs_wls_indicator_timer_reset();
 #endif
 
     if (wireless_get_current_devs() == DEVS_USB && USB_DRIVER.state == USB_STOP) {

@@ -56,24 +56,23 @@ void hs_power_init(void) {
     hs_power_stage     = HS_POWER_ACTIVE;
     hs_last_activity   = timer_read32();
     hs_saved_valid     = false;
-    hs_power_rgb_off   = false;
+    hs_indicator_power_off_set(false);
     power_policy_low_bat_reset(&hs_low_bat_state);
     hs_low_bat_capped  = false;
     hs_low_bat_saved_val = 0;
     hs_low_bat_side_capped = false;
     hs_low_bat_saved_side_val = 0;
-    hs_status          = HS_STATUS_NONE;
-    hs_status_force_rgb = false;
-    hs_indicator_rgb_acquired = false;
+    hs_status_reset();
+    hs_indicator_rgb_acquired_clear();
 
     hs_last_devs             = hs_settings.wireless_mode;
     hs_power_devs_initialized = false;
-    hs_last_charging   = charging_state;
-    hs_last_full       = bat_full_flag;
+    hs_last_charging   = hs_battery_charging();
+    hs_last_full       = hs_battery_is_full();
 }
 
 static bool hs_power_should_save(void) {
-    return power_policy_should_save(wireless_get_current_devs() == DEVS_USB || charging_state, hs_power.usb_save);
+    return power_policy_should_save(wireless_get_current_devs() == DEVS_USB || hs_battery_charging(), hs_power.usb_save);
 }
 
 static void hs_power_save_snapshot(void) {
@@ -88,13 +87,13 @@ static void hs_power_restore(void) {
     if (hs_power_stage == HS_POWER_ACTIVE) return;
 
     hs_power_stage   = HS_POWER_ACTIVE;
-    hs_power_rgb_off = false;
+    hs_indicator_power_off_set(false);
 
     // 空闲期间用户可能通过上位机改了总开关或侧灯模式，恢复时以最新设置为准
     if (hs_saved_rgb_enabled && mm_get_rgb_enable()) {
         rgb_matrix_enable_noeeprom();
         rgb_matrix_sethsv_noeeprom(hs_saved_rgb_hsv.h, hs_saved_rgb_hsv.s, hs_saved_rgb_hsv.v);
-        hs_indicator_rgb_acquired = false;
+        hs_indicator_rgb_acquired_clear();
     }
     if (hs_saved_side_enabled && mm_get_rgb_enable() && hs_settings.side_light_mode != 10) {
         rgblight_enable_noeeprom();
@@ -139,7 +138,7 @@ static void hs_power_enter_off(void) {
         hs_power_save_snapshot();
     }
     hs_power_stage   = HS_POWER_OFF;
-    hs_power_rgb_off = true;
+    hs_indicator_power_off_set(true);
 
     if (hs_saved_rgb_enabled) rgb_matrix_disable_noeeprom();
     if (hs_saved_side_enabled) rgblight_disable_noeeprom();
@@ -248,15 +247,10 @@ void hs_power_task(void) {
     uint32_t now     = timer_read32();
     uint8_t  battery = hs_battery_percent();
 
-    if (hs_status != HS_STATUS_NONE && timer_elapsed32(hs_status_start) >= hs_status_duration) {
-        hs_status_end();
-    }
-    if (hs_status == HS_STATUS_NONE && hs_status_force_rgb) {
-        hs_status_end();
-    }
+    hs_status_overlay_task();
 
     // 低电保护倒计时：侧灯持续红色闪烁，直到进入保护深睡
-    if (!charging_state && hs_battery_low_confirmed() && hs_status != HS_STATUS_LOW_BAT) {
+    if (!hs_battery_charging() && hs_battery_low_confirmed() && !hs_status_is(HS_STATUS_LOW_BAT)) {
         hs_status_show(HS_STATUS_LOW_BAT, 20000, (RGB){150, 0, 0});
     }
 
@@ -281,10 +275,12 @@ void hs_power_task(void) {
     }
 
     // 插入充电线 / 充满时短暂提示，之后只保留 POV 指示灯
-    if (charging_state != hs_last_charging || bat_full_flag != hs_last_full) {
-        hs_last_charging = charging_state;
-        hs_last_full     = bat_full_flag;
-        switch (power_policy_charge_toast(charging_state, bat_full_flag, hs_status != HS_STATUS_NONE)) {
+    bool charging = hs_battery_charging();
+    bool full     = hs_battery_is_full();
+    if (charging != hs_last_charging || full != hs_last_full) {
+        hs_last_charging = charging;
+        hs_last_full     = full;
+        switch (power_policy_charge_toast(charging, full, hs_status_busy())) {
             case POWER_POLICY_CHARGE_TOAST_CHARGING:
                 hs_status_show(HS_STATUS_CHARGING, 3000, (RGB){0, 150, 0});
                 break;
@@ -296,7 +292,7 @@ void hs_power_task(void) {
         }
     }
 
-    uint8_t low_bat_actions = power_policy_low_bat_update(&hs_low_bat_state, battery, charging_state, hs_power.low_bat_level, now, hs_status != HS_STATUS_NONE);
+    uint8_t low_bat_actions = power_policy_low_bat_update(&hs_low_bat_state, battery, charging, hs_power.low_bat_level, now, hs_status_busy());
     if (low_bat_actions & POWER_POLICY_LOW_BAT_ACTION_WARN) {
         hs_status_show(HS_STATUS_LOW_BAT, 3000, (RGB){150, 0, 0});
     }
@@ -326,10 +322,10 @@ void hs_power_task(void) {
 void hs_power_apply_settings(void) {
     hs_last_activity = timer_read32();
 
-    if (!hs_power.status_led && (hs_status != HS_STATUS_NONE || hs_status_force_rgb)) {
+    if (!hs_power.status_led && (hs_status_busy() || hs_status_force_active())) {
         hs_status_end();
     }
-    if (!hs_power.low_bat_level && hs_status == HS_STATUS_LOW_BAT) {
+    if (!hs_power.low_bat_level && hs_status_is(HS_STATUS_LOW_BAT)) {
         hs_status_end();
     }
     if (!hs_power.low_bat_level) {
@@ -349,8 +345,8 @@ void hs_power_apply_settings(void) {
 }
 
 const char *hs_power_state_name(void) {
-    if (charging_state && bat_full_flag) return "Full";
-    if (charging_state) return "Charging";
+    if (hs_battery_is_full()) return "Full";
+    if (hs_battery_charging()) return "Charging";
     if (hs_low_bat_state.active) return "Low Battery";
     if (hs_power_stage == HS_POWER_DIM) return "Dim";
     if (hs_power_stage == HS_POWER_OFF) return "Off";
@@ -358,8 +354,8 @@ const char *hs_power_state_name(void) {
 }
 
 uint8_t hs_power_state_code(void) {
-    if (charging_state && bat_full_flag) return HS_POWER_STATE_FULL;
-    if (charging_state) return HS_POWER_STATE_CHARGING;
+    if (hs_battery_is_full()) return HS_POWER_STATE_FULL;
+    if (hs_battery_charging()) return HS_POWER_STATE_CHARGING;
     if (hs_low_bat_state.active) return HS_POWER_STATE_LOW_BATTERY;
     if (hs_power_stage == HS_POWER_DIM) return HS_POWER_STATE_DIM;
     if (hs_power_stage == HS_POWER_OFF) return HS_POWER_STATE_OFF;

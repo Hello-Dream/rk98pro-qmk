@@ -84,12 +84,12 @@ bool rgbrec_show(uint8_t channel);
 void rgbrec_init(uint8_t channel);
 bool rgbrec_is_started(void);
 void eeconfig_init_user_datablock(void);
-/* 上游会在 keyboard_post_init_kb 之前自动重建用户数据区；
- * 该标志让主文件随后执行一次完整的键盘设置复位 */
-extern bool hs_user_datablock_reset;
 bool rgbrec_register_record(uint16_t keycode, keyrecord_t *record);
 uint8_t record_color_read_data(void);
 void record_rgbmatrix_increase(uint8_t *last_mode);
 uint8_t record_color_hsv(bool status);
+
+bool rgbrec_bat_requested(void);
+void rgbrec_bat_request_set(bool requested);
 
 void query(void);

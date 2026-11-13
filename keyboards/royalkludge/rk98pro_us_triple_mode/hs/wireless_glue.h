@@ -87,7 +87,6 @@ enum hs_power_state_id {
     HS_POWER_STATE_UNKNOWN = 0xFF,
 };
 
-extern bool lower_sleep;
 extern uint8_t hs_get_sleep_timeout(void);
 extern void hs_set_sleep_timeout(uint8_t time);
 extern void hs_settings_update(void);
@@ -125,8 +124,8 @@ void hs_power_activity(void);
 /* 用户在 VIA 中主动打开灯效时，取消状态灯的临时点亮标记 */
 void hs_power_rgb_user_enabled(void);
 
-extern uint32_t post_init_timer;
-extern bool linker_ok;
+void hs_wireless_post_init_begin(void);
+bool hs_wireless_linker_ok(void);
 void wireless_post_task(void);
 bool process_record_wls(uint16_t keycode, keyrecord_t *record);
 void hs_set_sleep_state(void);
@@ -136,7 +135,9 @@ void rgb_matrix_wls_indicator(void);
 void hs_wls_connected_indicator(void);
 void hs_wls_indicator_force_task(void);
 void hs_rgb_blink_hook_user(void);
-extern uint32_t wls_rgb_indicator_timer;
+#if defined(RGB_MATRIX_ENABLE) && defined(WIRELESS_ENABLE)
+void hs_wls_indicator_timer_reset(void);
+#endif
 
 bool hs_rgb_blink_hook(void);
 bool hs_mode_scan(bool update, uint8_t moude, uint8_t lsat_btdev);

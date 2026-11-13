@@ -14,9 +14,9 @@ void hs_send_bat_status(void) {
 
     hs_battery_task();
 
-    if (charging_state && (bat_full_flag)) {
+    if (hs_battery_is_full()) {
         hs_now_mode = MD_SND_CMD_DEVCTRL_CHARGING_DONE;
-    } else if (charging_state) {
+    } else if (hs_battery_charging()) {
         hs_now_mode = MD_SND_CMD_DEVCTRL_CHARGING;
     } else {
         hs_now_mode = MD_SND_CMD_DEVCTRL_CHARGING_STOP;

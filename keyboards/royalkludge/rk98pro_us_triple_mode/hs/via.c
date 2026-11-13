@@ -26,10 +26,10 @@ static void via_battery_label(uint8_t *value_data, uint8_t length) {
     char    text[16];
     uint8_t pos = 0;
 
-    if (charging_state && bat_full_flag) {
+    if (hs_battery_is_full()) {
         const char *prefix = "Full ";
         while (*prefix) text[pos++] = *prefix++;
-    } else if (charging_state) {
+    } else if (hs_battery_charging()) {
         const char *prefix = "Charging ";
         while (*prefix) text[pos++] = *prefix++;
     }

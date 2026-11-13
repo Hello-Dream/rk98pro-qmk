@@ -49,7 +49,7 @@ void hs_settings_reset(void) {
 #endif
 
 #ifdef RGBLIGHT_ENABLE
-    rgblight_mode(buff[0]);
+    rgblight_mode(hs_rgb_side_light_default_mode());
 #endif
 
     eeconfig_power_default();
@@ -62,5 +62,4 @@ void hs_settings_init(void) {
         hs_store_settings_flush();
     }
     eeconfig_power_init();
-    hs_user_datablock_reset = false;
 }
