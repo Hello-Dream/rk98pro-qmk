@@ -20,6 +20,9 @@ jobs:
       - name: Checkout this keyboard repo
         uses: actions/checkout@v7
 
+      - name: Check status protocol contract
+        run: python3 scripts/check_status_protocol.py
+
       - name: Install Linux dependencies
         run: |
           sudo apt-get update

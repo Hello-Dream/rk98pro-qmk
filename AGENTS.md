@@ -16,6 +16,7 @@
 ```bash
 python3 scripts/check_constraints.py --base origin/main --strict
 python3 scripts/validate_via_json.py
+python3 scripts/check_status_protocol.py
 git diff --check origin/main...HEAD -- '*.c' '*.h'
 (cd host && pnpm lint && pnpm typecheck && pnpm test && pnpm build)
 (cd host/src-tauri && cargo fmt -- --check)
@@ -93,6 +94,7 @@ make royalkludge/rk98pro_us_triple_mode:default:flash
 
 - 发版时同步产品版本：`keyboard.json` 的 `version`、`config.h` 的 `HS_FIRMWARE_VERSION_*`、`host/package.json`、`host/src-tauri/Cargo.toml`，以及 `CHANGELOG.md`、`README.md` 和 `RELEASE_NOTES.md`；`scripts/check_constraints.py` 会校验这些版本一致。
 - `HS_SETTINGS_VERSION` 和 `HS_STATUS_SNAPSHOT_VERSION` 是兼容性版本，不随产品版本递增；前者只在 EEPROM 布局变化时递增，后者只在状态快照字段或事件格式变化时递增。
+- 状态快照字段、事件格式或协议常量变化时，必须同步更新 `scripts/check_status_protocol.py` 的期望表；CI 会按该脚本校验 C/Rust/TS 三端契约。
 - 发布产物是 `royalkludge_rk98pro_us_triple_mode_default.bin` 和 `rk98pro_us_triple_mode.json`，以及 Windows / Linux 的 x64、ARM64 上位机安装包；推送 `v*` tag 会触发 Release，正文取自 `RELEASE_NOTES.md`。普通 push 只跑校验、测试和固件编译，不生成桌面安装包。
 - Linux deb/rpm 安装包必须包含 `/usr/lib/udev/rules.d/99-rk98pro.rules`；`tauri.conf.json` 的 `bundle.linux.deb.files` / `rpm.files` 负责映射，CI 用 `dpkg-deb -c` 和 `rpm -qpl` 校验。
 - `*.bin`、`*.hex`、`*.uf2`、`*.elf` 已被 `.gitignore` 忽略；根目录同名产物是本地文件，不要提交。

@@ -23,6 +23,11 @@
 #define HS_STATUS_LOCK_WIN       (1u << 3)
 #define HS_STATUS_LOCK_CAPS_WORD (1u << 4)
 
+#define HS_CHARGING_DISCHARGING 0
+#define HS_CHARGING_CHARGING    1
+#define HS_CHARGING_FULL        2
+#define HS_CHARGING_UNKNOWN     0xFF
+
 typedef struct PACKED {
     uint8_t  version;
     uint8_t  seq;

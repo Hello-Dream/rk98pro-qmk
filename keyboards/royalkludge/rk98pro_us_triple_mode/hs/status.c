@@ -50,7 +50,7 @@ static void hs_status_build_snapshot(hs_status_snapshot_t *snapshot) {
     snapshot->fw_patch         = HS_FIRMWARE_VERSION_PATCH;
     snapshot->settings_version = HS_SETTINGS_VERSION;
     snapshot->battery          = battery > 100 ? 0xFF : battery;
-    snapshot->charging         = hs_battery_charging() ? (hs_battery_is_full() ? 2 : 1) : 0;
+    snapshot->charging         = hs_battery_charging() ? (hs_battery_is_full() ? HS_CHARGING_FULL : HS_CHARGING_CHARGING) : HS_CHARGING_DISCHARGING;
     snapshot->power_state      = hs_power_state_code();
     snapshot->layer            = get_highest_layer(layer_state);
     snapshot->default_layer    = get_highest_layer(default_layer_state);
