@@ -5,6 +5,24 @@
 > [!NOTE]
 > 自定义 EEPROM 设置（`hs_settings`、按键 RGB 录制、侧灯 HSV 槽位）带有版本号与 CRC。首次刷入或检测到版本/CRC 不符时，固件会恢复默认设置，并同步刷新 VIA 缓存，正常无需手动清空 EEPROM；降级或数据异常时仍可按 [README.md](README.md#upgrade-eeprom) 手动清空。
 
+## [1.0.4] - 2026-11-16
+
+### 固件运行时状态封装
+
+- `hs/indicators`、`hs/rgb`、`hs/wireless` 等模块的 `extern` 全局变量改为访问器函数，调用方不再直接读写共享状态。
+- 状态灯、电量强制显示、无线指示、RGB 录制标记与侧灯模式分别由所属模块提供接口。
+- 充电状态改用 `HS_CHARGING_DISCHARGING`、`HS_CHARGING_CHARGING`、`HS_CHARGING_FULL`、`HS_CHARGING_UNKNOWN` 命名常量，快照字节值不变。
+
+### 协议契约校验
+
+- 新增 `scripts/check_status_protocol.py`，校验 C 快照布局与关键赋值、raw HID 事件偏移、电池满电阈值、VIA `0x22` 分发，以及 Rust/TS 字段映射与充电降级逻辑。
+- CI verify 任务与 AGENTS.md 提交前校验同步加入该脚本。
+
+### 兼容性
+
+- 固件、VIA 定义与上位机版本号统一为 `1.0.4`。
+- 不改变键盘配置、状态快照协议、EEPROM 布局或现有用户设置；从 v1.0.3 升级无需手动清空 EEPROM。
+
 ## [1.0.3] - 2026-11-12
 
 ### 固件结构重构
